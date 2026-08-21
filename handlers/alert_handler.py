@@ -152,19 +152,14 @@ class AlertHandler:
         now = datetime.now(timezone.utc)
 
         cooldown_until = self._driver_cooldown_until.get(driver_id)
-        if cooldown_until:
-            if isinstance(cooldown_until, str):
-                cooldown_until = datetime.fromisoformat(cooldown_until)
-            if cooldown_until.tzinfo is None:
-                cooldown_until = cooldown_until.replace(tzinfo=timezone.utc)
-            if now < cooldown_until:
-                # Driver is spamming #repairs/#maintenance within the cooldown
-                # window. Don't open a duplicate case for it — but if their
-                # last case is still sitting unassigned, that's a signal
-                # worth escalating to agents (throttled separately below).
-                await self._nudge_if_unassigned(driver_id, ctx)
-                return
-
+        if False and cooldown_until:  # TEMP: cooldown disabled for load testing — revert before prod!
+          if isinstance(cooldown_until, str):
+            cooldown_until = datetime.fromisoformat(cooldown_until)
+          if cooldown_until.tzinfo is None:
+            cooldown_until = cooldown_until.replace(tzinfo=timezone.utc)
+          if now < cooldown_until:
+            await self._nudge_if_unassigned(driver_id, ctx)
+            return
         self._driver_last_time[driver_id] = now
         self._driver_cooldown_until[driver_id] = now + timedelta(
             seconds=random.uniform(COOLDOWN_MIN_SECONDS, COOLDOWN_MAX_SECONDS)
