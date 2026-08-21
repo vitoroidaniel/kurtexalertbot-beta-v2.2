@@ -74,9 +74,10 @@ def _active_case_keyboard(case_id, status="assigned"):
             InlineKeyboardButton("✅ Solve",    callback_data=f"close_ask|{case_id}"),
             InlineKeyboardButton("🔁 Reassign", callback_data=f"reassign_{case_id}"),
         ]])
+    from handlers.webapp_utils import report_button
     return InlineKeyboardMarkup([[
         InlineKeyboardButton("✅ Solve",    callback_data=f"close_ask|{case_id}"),
-        InlineKeyboardButton("📋 Report",   callback_data=f"solve|{case_id}"),
+        report_button(case_id),
         InlineKeyboardButton("🔁 Reassign", callback_data=f"reassign_{case_id}"),
     ]])
 

@@ -152,14 +152,19 @@ class AlertHandler:
         now = datetime.now(timezone.utc)
 
         cooldown_until = self._driver_cooldown_until.get(driver_id)
-        if False and cooldown_until:  # TEMP: cooldown disabled for load testing — revert before prod!
-          if isinstance(cooldown_until, str):
-            cooldown_until = datetime.fromisoformat(cooldown_until)
-          if cooldown_until.tzinfo is None:
-            cooldown_until = cooldown_until.replace(tzinfo=timezone.utc)
-          if now < cooldown_until:
-            await self._nudge_if_unassigned(driver_id, ctx)
-            return
+        if cooldown_until:
+            if isinstance(cooldown_until, str):
+                cooldown_until = datetime.fromisoformat(cooldown_until)
+            if cooldown_until.tzinfo is None:
+                cooldown_until = cooldown_until.replace(tzinfo=timezone.utc)
+            if now < cooldown_until:
+                # Driver is spamming #repairs/#maintenance within the cooldown
+                # window. Don't open a duplicate case for it — but if their
+                # last case is still sitting unassigned, that's a signal
+                # worth escalating to agents (throttled separately below).
+                await self._nudge_if_unassigned(driver_id, ctx)
+                return
+
         self._driver_last_time[driver_id] = now
         self._driver_cooldown_until[driver_id] = now + timedelta(
             seconds=random.uniform(COOLDOWN_MIN_SECONDS, COOLDOWN_MAX_SECONDS)
@@ -214,11 +219,13 @@ class AlertHandler:
                     sent = await ctx.bot.send_photo(
                         admin["id"], photo=photo.file_id,
                         caption=dm_text, parse_mode=ParseMode.MARKDOWN, reply_markup=kb,
+                        disable_notification=True,
                     )
                 else:
                     sent = await ctx.bot.send_message(
                         admin["id"], dm_text,
                         parse_mode=ParseMode.MARKDOWN, reply_markup=kb,
+                        disable_notification=True,
                     )
                 self._alerts[alert_id]["recipients"].setdefault(admin["id"], []).append(sent.message_id)
                 notified += 1
@@ -262,6 +269,7 @@ class AlertHandler:
             try:
                 sent = await ctx.bot.send_message(
                     admin["id"], text, parse_mode=ParseMode.MARKDOWN, reply_markup=kb,
+                    disable_notification=True,
                 )
                 record["recipients"].setdefault(admin["id"], []).append(sent.message_id)
             except TelegramError as e:
@@ -346,6 +354,7 @@ class AlertHandler:
                     sent = await ctx.bot.send_message(
                         admin["id"], dm_text,
                         parse_mode="Markdown", reply_markup=kb,
+                        disable_notification=True,
                     )
                     self._alerts[alert_id]["recipients"].setdefault(admin["id"], []).append(sent.message_id)
                 except Exception as e:
@@ -403,6 +412,7 @@ class AlertHandler:
                     f"The case you reassigned has been accepted.\n"
                     f"It has been removed from your active cases.",
                     parse_mode=ParseMode.MARKDOWN,
+                    disable_notification=True,
                 )
             except TelegramError:
                 pass
@@ -491,6 +501,7 @@ class AlertHandler:
                 return
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            from handlers.webapp_utils import report_button
             case_text = (
                 f"📋 *Active Case*\n\n"
                 f"📌 *Group:* {saved.get('group_name', '—')}\n"
@@ -499,13 +510,14 @@ class AlertHandler:
             )
             case_kb = InlineKeyboardMarkup([[
                 InlineKeyboardButton("✅ Solve",    callback_data=f"close_ask|{alert_id}"),
-                InlineKeyboardButton("📋 Report",   callback_data=f"solve|{alert_id}"),
+                report_button(alert_id),
                 InlineKeyboardButton("🔁 Reassign", callback_data=f"reassign_{alert_id}"),
             ]])
             try:
                 await ctx.bot.send_message(
                     admin.id, case_text,
                     parse_mode=ParseMode.MARKDOWN, reply_markup=case_kb,
+                    disable_notification=True,
                 )
             except TelegramError:
                 pass
@@ -550,6 +562,7 @@ class AlertHandler:
                     a["id"], dm_text,
                     parse_mode=ParseMode.MARKDOWN,
                     reply_markup=kb,
+                    disable_notification=True,
                 )
                 # Track so assignment can clean up these messages too
                 if record is not None:

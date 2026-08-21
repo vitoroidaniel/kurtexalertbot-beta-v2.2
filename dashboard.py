@@ -30,6 +30,35 @@ def verify_telegram_login(data):
     return hmac.compare_digest(computed, check_hash)
 
 
+def verify_webapp_init_data(init_data: str):
+    """
+    Validates Telegram Mini App initData per the official algorithm
+    (https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app).
+    Different HMAC construction than the Login Widget above — Mini Apps use
+    a "WebAppData"-derived secret key, not sha256(bot_token) directly.
+    Returns the parsed Telegram user dict on success, or None if invalid/stale.
+    """
+    from urllib.parse import parse_qsl
+    try:
+        pairs = dict(parse_qsl(init_data, strict_parsing=True))
+    except ValueError:
+        return None
+    check_hash = pairs.pop("hash", "")
+    if not check_hash:
+        return None
+    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(pairs.items()))
+    secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
+    computed   = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(computed, check_hash):
+        return None
+    if abs(time.time() - int(pairs.get("auth_date", 0))) > 86400:
+        return None
+    try:
+        return json.loads(pairs.get("user", "{}"))
+    except json.JSONDecodeError:
+        return None
+
+
 def get_bot_username():
     return os.getenv("BOT_USERNAME", "")
 
@@ -2925,7 +2954,462 @@ def api_fleet_intelligence():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/login")
+REPORT_APP_HTML = r"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Report</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{
+    --bg: var(--tg-theme-bg-color, #0e0e10);
+    --sec-bg: var(--tg-theme-secondary-bg-color, #17171a);
+    --text: var(--tg-theme-text-color, #f2f2f2);
+    --hint: var(--tg-theme-hint-color, #8a8a8e);
+    --link: var(--tg-theme-link-color, #5aa7ff);
+    --btn: var(--tg-theme-button-color, #2ea6ff);
+    --btn-text: var(--tg-theme-button-text-color, #ffffff);
+    --accent-green: #34c759;
+    --accent-yellow: #ffcc00;
+    --accent-red: #ff453a;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    background:var(--bg); color:var(--text); padding:12px 14px 100px;
+  }
+  h1{font-size:17px; margin:4px 0 2px;}
+  .sub{color:var(--hint); font-size:13px; margin-bottom:14px; line-height:1.4;}
+  .card{background:var(--sec-bg); border-radius:14px; padding:14px; margin-bottom:12px;}
+  .label{font-size:13px; color:var(--hint); margin-bottom:6px; font-weight:600; text-transform:uppercase; letter-spacing:.3px;}
+  .seg{display:flex; gap:8px; margin-bottom:4px;}
+  .seg button{
+    flex:1; padding:10px 6px; border-radius:10px; border:1.5px solid transparent;
+    background:var(--bg); color:var(--text); font-size:14px; font-weight:600; cursor:pointer;
+  }
+  .seg button.active{border-color:var(--btn); background:var(--btn); color:var(--btn-text);}
+  input[type=text], textarea{
+    width:100%; padding:11px 12px; border-radius:10px; border:none;
+    background:var(--bg); color:var(--text); font-size:15px; font-family:inherit;
+    margin-bottom:2px;
+  }
+  textarea{resize:vertical; min-height:60px;}
+  input::placeholder, textarea::placeholder{color:var(--hint);}
+  .field{margin-bottom:12px;}
+  .field:last-child{margin-bottom:0;}
+  .hidden{display:none !important;}
+  .media-strip{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;}
+  .thumb{position:relative; width:64px; height:64px; border-radius:10px; overflow:hidden; background:var(--bg);}
+  .thumb img, .thumb video{width:100%; height:100%; object-fit:cover;}
+  .thumb .x{
+    position:absolute; top:2px; right:2px; width:18px; height:18px; border-radius:50%;
+    background:rgba(0,0,0,.6); color:#fff; font-size:12px; line-height:18px; text-align:center; cursor:pointer;
+  }
+  .add-media{
+    width:64px; height:64px; border-radius:10px; border:1.5px dashed var(--hint);
+    display:flex; align-items:center; justify-content:center; font-size:24px; color:var(--hint); cursor:pointer;
+  }
+  .prio{display:flex; gap:8px;}
+  .prio button{flex:1; padding:10px 4px; border-radius:10px; border:1.5px solid transparent; font-size:13px; font-weight:600; cursor:pointer; color:#fff;}
+  .prio button[data-v=low]{background:rgba(52,199,89,.18); color:var(--accent-green);}
+  .prio button[data-v=medium]{background:rgba(255,204,0,.18); color:var(--accent-yellow);}
+  .prio button[data-v=high]{background:rgba(255,69,58,.18); color:var(--accent-red);}
+  .prio button.active[data-v=low]{background:var(--accent-green); color:#08210f;}
+  .prio button.active[data-v=medium]{background:var(--accent-yellow); color:#332900;}
+  .prio button.active[data-v=high]{background:var(--accent-red); color:#2b0503;}
+  .err{color:var(--accent-red); font-size:13px; margin-top:8px; display:none;}
+  .done-screen{text-align:center; padding-top:80px;}
+  .done-screen .icon{font-size:56px; margin-bottom:12px;}
+</style>
+</head>
+<body>
+
+<div id="form-view">
+  <h1>📋 Case Report</h1>
+  <div class="sub">{{ driver_name }} — {{ group_name }}<br>{{ issue_preview }}</div>
+
+  <div class="card">
+    <div class="label">Vehicle Type</div>
+    <div class="seg" id="seg-type">
+      <button data-v="truck" class="active">🚛 Truck</button>
+      <button data-v="trailer">🚚 Trailer</button>
+      <button data-v="reefer">❄️ Reefer</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="field">
+      <div class="label" id="unit-label">Truck Number</div>
+      <input type="text" id="unit_number" placeholder="e.g. 4471">
+    </div>
+    <div class="field">
+      <div class="label">Driver</div>
+      <input type="text" id="driver" placeholder="Driver name">
+    </div>
+    <div class="field">
+      <div class="label">Issue</div>
+      <textarea id="issue" placeholder="Describe the issue"></textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="label">Load Type</div>
+    <div class="seg" id="seg-load">
+      <button data-v="JBS Load" class="active">JBS</button>
+      <button data-v="Broker Load">Broker</button>
+      <button data-v="Meijer Load">Meijer</button>
+      <button data-v="Empty">Empty</button>
+    </div>
+    <div class="field" id="wrap-pickup" style="margin-top:12px;">
+      <div class="label">Pick up Location / Time</div>
+      <input type="text" id="pickup" placeholder="Optional">
+    </div>
+    <div class="field" id="wrap-delivery">
+      <div class="label">Delivery Location / Time</div>
+      <input type="text" id="delivery" placeholder="Optional">
+    </div>
+    <div class="field">
+      <div class="label">Current Location</div>
+      <input type="text" id="location" placeholder="Optional">
+    </div>
+  </div>
+
+  <div class="card hidden" id="card-reefer">
+    <div class="field">
+      <div class="label">Setpoint Temperature</div>
+      <input type="text" id="setpoint" placeholder="e.g. -10°C">
+    </div>
+    <div class="field">
+      <div class="label">Current Temperature</div>
+      <input type="text" id="current_temp" placeholder="e.g. -8°C">
+    </div>
+    <div class="field">
+      <div class="label">Temp Recorder</div>
+      <div class="seg" id="seg-temprec">
+        <button data-v="Y">Yes</button>
+        <button data-v="N" class="active">No</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="label">Comments</div>
+    <textarea id="comments" placeholder="Optional"></textarea>
+  </div>
+
+  <div class="card">
+    <div class="label">Photos / Videos</div>
+    <div class="media-strip" id="media-strip">
+      <div class="add-media" id="add-media">+</div>
+    </div>
+    <input type="file" id="file-input" accept="image/*,video/*" multiple capture="environment" class="hidden">
+  </div>
+
+  <div class="card">
+    <div class="label">Priority</div>
+    <div class="prio" id="seg-priority">
+      <button data-v="low" class="active">🟢 Low</button>
+      <button data-v="medium">🟡 Medium</button>
+      <button data-v="high">🔴 High</button>
+    </div>
+  </div>
+
+  <div class="err" id="err-box"></div>
+</div>
+
+<div id="done-view" class="done-screen hidden">
+  <div class="icon">✅</div>
+  <div style="font-size:16px; font-weight:600;">Report sent</div>
+  <div class="sub">You can close this window now.</div>
+</div>
+
+<script>
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand();
+
+const CASE_ID = {{ case_id|tojson }};
+const state = {
+  vehicle_type: "truck", load: "JBS Load", temp_recorder: "N", priority: "low",
+  media: []  // {file, kind}
+};
+
+function seg(id, key, onchange){
+  document.querySelectorAll('#'+id+' button').forEach(b=>{
+    b.onclick = () => {
+      document.querySelectorAll('#'+id+' button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      state[key] = b.dataset.v;
+      if(onchange) onchange(b.dataset.v);
+    };
+  });
+}
+
+seg('seg-type', 'vehicle_type', v => {
+  document.getElementById('unit-label').textContent = v === 'trailer' ? 'Trailer Number' : (v === 'reefer' ? 'Reefer / Trailer Number' : 'Truck Number');
+  document.getElementById('card-reefer').classList.toggle('hidden', !(v === 'reefer' && state.load !== 'Empty'));
+});
+seg('seg-load', 'load', v => {
+  const isEmpty = v === 'Empty';
+  document.getElementById('wrap-pickup').classList.toggle('hidden', isEmpty);
+  document.getElementById('wrap-delivery').classList.toggle('hidden', isEmpty);
+  document.getElementById('card-reefer').classList.toggle('hidden', !(state.vehicle_type === 'reefer' && !isEmpty));
+});
+seg('seg-temprec', 'temp_recorder');
+seg('seg-priority', 'priority');
+
+document.getElementById('add-media').onclick = () => document.getElementById('file-input').click();
+document.getElementById('file-input').onchange = (e) => {
+  for(const f of e.target.files){
+    if(state.media.length >= 8){ break; }
+    const kind = f.type.startsWith('video') ? 'video' : 'photo';
+    state.media.push({file: f, kind});
+    addThumb(f, kind);
+  }
+  e.target.value = '';
+};
+
+function addThumb(file, kind){
+  const strip = document.getElementById('media-strip');
+  const addBtn = document.getElementById('add-media');
+  const div = document.createElement('div');
+  div.className = 'thumb';
+  const url = URL.createObjectURL(file);
+  div.innerHTML = kind === 'video'
+    ? `<video src="${url}" muted></video>`
+    : `<img src="${url}">`;
+  const x = document.createElement('div');
+  x.className = 'x'; x.textContent = '✕';
+  x.onclick = () => {
+    const idx = state.media.findIndex(m => m.file === file);
+    if(idx > -1) state.media.splice(idx, 1);
+    div.remove();
+  };
+  div.appendChild(x);
+  strip.insertBefore(div, addBtn);
+}
+
+function showError(msg){
+  const box = document.getElementById('err-box');
+  box.textContent = msg;
+  box.style.display = 'block';
+}
+
+tg.MainButton.setText('Send Report');
+tg.MainButton.show();
+tg.MainButton.onClick(submit);
+
+async function submit(){
+  document.getElementById('err-box').style.display = 'none';
+  const driver = document.getElementById('driver').value.trim();
+  const issue  = document.getElementById('issue').value.trim();
+  if(!driver || !issue){
+    showError('Driver and Issue are required.');
+    tg.HapticFeedback.notificationOccurred('error');
+    return;
+  }
+
+  tg.MainButton.showProgress(true);
+  tg.MainButton.disable();
+
+  const fd = new FormData();
+  fd.append('init_data', tg.initData);
+  fd.append('case_id', CASE_ID);
+  fd.append('vehicle_type', state.vehicle_type);
+  fd.append('unit_number', document.getElementById('unit_number').value.trim());
+  fd.append('driver', driver);
+  fd.append('issue', issue);
+  fd.append('load', state.load);
+  fd.append('pickup', document.getElementById('pickup').value.trim());
+  fd.append('delivery', document.getElementById('delivery').value.trim());
+  fd.append('location', document.getElementById('location').value.trim());
+  fd.append('setpoint', document.getElementById('setpoint').value.trim());
+  fd.append('current_temp', document.getElementById('current_temp').value.trim());
+  fd.append('temp_recorder', state.temp_recorder);
+  fd.append('comments', document.getElementById('comments').value.trim());
+  fd.append('priority', state.priority);
+  state.media.forEach(m => fd.append('media', m.file, m.file.name || (m.kind + '.jpg')));
+
+  try{
+    const res = await fetch('/api/webapp/submit_report', { method: 'POST', body: fd });
+    const data = await res.json();
+    if(!res.ok || !data.ok){
+      throw new Error(data.error || 'Failed to send report.');
+    }
+    tg.HapticFeedback.notificationOccurred('success');
+    document.getElementById('form-view').classList.add('hidden');
+    document.getElementById('done-view').classList.remove('hidden');
+    tg.MainButton.hide();
+    setTimeout(() => tg.close(), 1400);
+  }catch(err){
+    tg.MainButton.hideProgress();
+    tg.MainButton.enable();
+    showError(err.message || 'Something went wrong. Please try again.');
+    tg.HapticFeedback.notificationOccurred('error');
+  }
+}
+</script>
+</body>
+</html>
+"""
+
+
+@app.route("/report-app")
+def report_app():
+    case_id = request.args.get("case_id", "")
+    from storage.case_store import get_case
+    case = get_case(case_id) if case_id else None
+    if not case or case.get("status") not in ("assigned", "reported"):
+        return render_template_string(
+            "<body style='font-family:sans-serif;padding:40px;text-align:center;color:#888'>"
+            "This case is no longer active. You can close this window.</body>"
+        )
+    return render_template_string(
+        REPORT_APP_HTML,
+        case_id=case_id,
+        driver_name=case.get("driver_name", "—"),
+        group_name=case.get("group_name", "—"),
+        issue_preview=(case.get("description") or "")[:100],
+    )
+
+
+@app.route("/api/webapp/submit_report", methods=["POST"])
+def api_webapp_submit_report():
+    init_data = request.form.get("init_data", "")
+    user = verify_webapp_init_data(init_data)
+    if not user:
+        return jsonify({"ok": False, "error": "Could not verify Telegram session. Please reopen from the bot."}), 401
+
+    case_id = request.form.get("case_id", "").strip()
+    if not case_id:
+        return jsonify({"ok": False, "error": "Missing case."}), 400
+
+    from storage.case_store import get_case, report_case, update_case_fields
+    from storage.fleet_store import get_or_create_unit
+    from handlers.report_handler import _build_report
+
+    case = get_case(case_id)
+    if not case or case.get("status") not in ("assigned", "reported"):
+        return jsonify({"ok": False, "error": "This case is no longer active."}), 409
+
+    handler_name = f"{user.get('first_name','')} {user.get('last_name') or ''}".strip() or user.get("username", "Agent")
+
+    f = request.form
+    data = {
+        "vehicle_type":   f.get("vehicle_type", "truck"),
+        "unit_number":    f.get("unit_number", ""),
+        "driver":         f.get("driver", ""),
+        "issue":          f.get("issue", ""),
+        "load":           f.get("load", ""),
+        "pickup":         f.get("pickup") or "—",
+        "delivery":       f.get("delivery") or "—",
+        "location":       f.get("location") or "—",
+        "setpoint":       f.get("setpoint") or "—",
+        "current_temp":   f.get("current_temp") or "—",
+        "temp_recorder":  f.get("temp_recorder", "N"),
+        "comments":       f.get("comments", ""),
+        "priority":       f.get("priority", "low"),
+        "handler":        handler_name,
+    }
+    report_text = _build_report(data)
+
+    dest_id = config.REPORTS_GROUP_ID
+    if not dest_id:
+        return jsonify({"ok": False, "error": "No reports group configured."}), 500
+
+    import requests as _requests
+    api = f"https://api.telegram.org/bot{BOT_TOKEN}"
+    files = request.files.getlist("media")
+
+    def _kind_for(file_storage):
+        mt = (file_storage.mimetype or "").lower()
+        if mt.startswith("video"):
+            return "sendVideo", "video"
+        if mt.startswith("image"):
+            return "sendPhoto", "photo"
+        return "sendDocument", "document"
+
+    try:
+        if files:
+            first = files[0]
+            method, field = _kind_for(first)
+            resp = _requests.post(
+                f"{api}/{method}",
+                data={"chat_id": dest_id, "caption": report_text, "parse_mode": "Markdown"},
+                files={field: (first.filename, first.stream, first.mimetype)},
+                timeout=30,
+            )
+            if not resp.ok:
+                # Markdown escaping issue or similar — fall back to plain caption
+                first.stream.seek(0)
+                resp = _requests.post(
+                    f"{api}/{method}",
+                    data={"chat_id": dest_id, "caption": report_text[:1024]},
+                    files={field: (first.filename, first.stream, first.mimetype)},
+                    timeout=30,
+                )
+                resp.raise_for_status()
+            for extra in files[1:]:
+                method, field = _kind_for(extra)
+                try:
+                    _requests.post(
+                        f"{api}/{method}",
+                        data={"chat_id": dest_id},
+                        files={field: (extra.filename, extra.stream, extra.mimetype)},
+                        timeout=30,
+                    )
+                except Exception as e:
+                    logger.error(f"webapp extra media failed: {e}")
+        else:
+            resp = _requests.post(
+                f"{api}/sendMessage",
+                data={"chat_id": dest_id, "text": report_text, "parse_mode": "Markdown"},
+                timeout=15,
+            )
+            resp.raise_for_status()
+    except Exception as e:
+        logger.error(f"webapp submit_report send failed: {e}")
+        return jsonify({"ok": False, "error": "Failed to deliver report to the reports group."}), 502
+
+    try:
+        report_case(case_id)
+        vtype       = data["vehicle_type"]
+        unit_number = data["unit_number"]
+        fleet_fk    = {"truck": "truck_id", "trailer": "trailer_id", "reefer": "reefer_id"}.get(vtype)
+        fleet_fields = {}
+        if fleet_fk and unit_number:
+            unit_id = get_or_create_unit(unit_number, vtype)
+            if unit_id:
+                fleet_fields[fleet_fk] = unit_id
+        update_case_fields(
+            case_id,
+            vehicle_type=vtype, unit_number=unit_number,
+            report_driver=data["driver"], issue_text=data["issue"],
+            load_type=data["load"], location=data["location"],
+            priority=data["priority"], pickup=data["pickup"], delivery=data["delivery"],
+            comments=data["comments"], setpoint=data["setpoint"],
+            current_temp=data["current_temp"], temp_recorder=data["temp_recorder"],
+            **fleet_fields,
+        )
+    except Exception as e:
+        logger.error(f"webapp submit_report DB update failed: {e}")
+        # Report already reached the reports group — don't fail the request over
+        # analytics bookkeeping, just log it.
+
+    try:
+        _requests.post(
+            f"{api}/sendMessage",
+            data={"chat_id": user["id"], "text": "✅ Report sent!", "disable_notification": True},
+            timeout=10,
+        )
+    except Exception:
+        pass
+
+    return jsonify({"ok": True})
+
+
+
 def login():
     return render_template_string(LOGIN_HTML, bot_username=get_bot_username(), error=request.args.get("error"))
 

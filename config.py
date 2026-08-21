@@ -73,6 +73,10 @@ class Config:
     WEBHOOK_SECRET       = os.getenv("WEBHOOK_SECRET", "").strip()
     USE_WEBHOOK          = bool(WEBHOOK_URL)
     DATA_DIR             = os.getenv("DATA_DIR", "/app/data")
+    # Public HTTPS base URL of this Railway service (Settings → Networking →
+    # Generate Domain), used to build the Report Mini App link. Without it,
+    # the Report button falls back to the old chat-based /report flow.
+    PUBLIC_URL           = os.getenv("PUBLIC_URL", "").strip().rstrip("/")
 
 
 config = Config()
