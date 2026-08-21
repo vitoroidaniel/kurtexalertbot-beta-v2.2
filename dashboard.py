@@ -16,7 +16,7 @@ app.secret_key = os.getenv("DASHBOARD_SECRET", "kurtex-dashboard-secret-change-m
 
 DATA_DIR       = Path(os.getenv("DATA_DIR", "/app/data"))
 BOT_TOKEN      = os.getenv("BOT_TOKEN", "")
-DASHBOARD_PORT = int(os.getenv("DASHBOARD_PORT", "8080"))
+DASHBOARD_PORT = int(os.getenv("PORT") or os.getenv("DASHBOARD_PORT", "8080"))
 
 
 def verify_telegram_login(data):
@@ -3409,7 +3409,7 @@ def api_webapp_submit_report():
     return jsonify({"ok": True})
 
 
-
+@app.route("/login")
 def login():
     return render_template_string(LOGIN_HTML, bot_username=get_bot_username(), error=request.args.get("error"))
 
