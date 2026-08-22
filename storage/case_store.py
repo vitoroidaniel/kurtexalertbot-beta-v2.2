@@ -174,6 +174,47 @@ def mark_reassigned(case_id: str) -> None:
     conn.commit()
 
 
+# ── Active-case card tracking ────────────────────────────────────────────────
+# The "📋 Active Case" DM card (Solve / Report / Reassign buttons) can be sent
+# to an admin from several places (assignment, /mycases, reassign-accept...).
+# We remember the *latest* copy sent so that once a report actually goes
+# through (either the old chat flow or the Report Mini App), we can strip its
+# buttons — otherwise the same card sits there inviting a second, duplicate
+# report for the same case.
+
+def set_active_card(case_id: str, chat_id: int, message_id: int) -> None:
+    import json
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO kv (key, value) VALUES (?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        (f"active_card:{case_id}", json.dumps({"chat_id": chat_id, "message_id": message_id})),
+    )
+    conn.commit()
+
+
+def get_active_card(case_id: str) -> Optional[dict]:
+    import json
+    conn = get_conn()
+    row = conn.execute("SELECT value FROM kv WHERE key=?", (f"active_card:{case_id}",)).fetchone()
+    if not row:
+        return None
+    try:
+        return json.loads(row["value"])
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
+def clear_active_card(case_id: str) -> None:
+    conn = get_conn()
+    conn.execute("DELETE FROM kv WHERE key=?", (f"active_card:{case_id}",))
+    conn.commit()
+
+
+async def async_set_active_card(case_id, chat_id, message_id):
+    return await run(set_active_card, case_id, chat_id, message_id)
+
+
 def update_case_fields(case_id: str, **fields) -> Optional[dict]:
     """Generic column update — used for the fleet-report fields collected
     in the /report conversation (vehicle_type, unit_number, location, ...)."""

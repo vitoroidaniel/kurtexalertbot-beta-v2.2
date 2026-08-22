@@ -3464,10 +3464,11 @@ def report_app():
     case_id = request.args.get("case_id", "")
     from storage.case_store import get_case
     case = get_case(case_id) if case_id else None
-    if not case or case.get("status") not in ("assigned", "reported"):
+    if not case or case.get("status") not in ("assigned",):
+        msg = "This case was already reported." if case and case.get("status") == "reported" else "This case is no longer active."
         return render_template_string(
             "<body style='font-family:sans-serif;padding:40px;text-align:center;color:#888'>"
-            "This case is no longer active. You can close this window.</body>"
+            + msg + " You can close this window.</body>"
         )
     return render_template_string(
         REPORT_APP_HTML,
@@ -3547,8 +3548,9 @@ def api_webapp_submit_report():
         from handlers.report_handler import _build_report
 
         case = get_case(case_id)
-        if not case or case.get("status") not in ("assigned", "reported"):
-            return jsonify({"ok": False, "error": "This case is no longer active."}), 409
+        if not case or case.get("status") != "assigned":
+            msg = "This case was already reported." if case and case.get("status") == "reported" else "This case is no longer active."
+            return jsonify({"ok": False, "error": msg}), 409
 
         handler_name = f"{user.get('first_name','')} {user.get('last_name') or ''}".strip() or user.get("username", "Agent")
 
@@ -3655,6 +3657,28 @@ def api_webapp_submit_report():
             # analytics bookkeeping, just log it.
 
         _clear_draft(case_id, user["id"])
+
+        # Strip the buttons off whichever "Active Case" card is currently
+        # showing for this case, so it can't be tapped into a second, duplicate
+        # report. We track the most recently sent copy in the kv table (see
+        # storage.case_store.set_active_card / get_active_card).
+        try:
+            from storage.case_store import get_active_card, clear_active_card
+            card = get_active_card(case_id)
+            if card:
+                _requests.post(
+                    f"{api}/editMessageText",
+                    data={
+                        "chat_id": card["chat_id"],
+                        "message_id": card["message_id"],
+                        "text": "✅ *Reported*\n\n" + report_text,
+                        "parse_mode": "Markdown",
+                    },
+                    timeout=10,
+                )
+                clear_active_card(case_id)
+        except Exception as e:
+            logger.error(f"webapp submit_report card cleanup failed: {e}")
 
         try:
             _requests.post(

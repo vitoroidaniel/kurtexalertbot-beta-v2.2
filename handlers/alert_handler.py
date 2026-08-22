@@ -24,7 +24,7 @@ from shift_manager import get_on_shift_admins, get_all_admins
 from storage.case_store import (
     async_create_case, async_assign_case,
     async_save_active_alerts, async_load_active_alerts,
-    async_set_report_msg_id, async_mark_reassigned,
+    async_set_report_msg_id, async_mark_reassigned, async_set_active_card,
 )
 from storage.user_store import is_authorized, get_super_admin_ids
 from config import config
@@ -514,11 +514,12 @@ class AlertHandler:
                 InlineKeyboardButton("🔁 Reassign", callback_data=f"reassign_{alert_id}"),
             ]])
             try:
-                await ctx.bot.send_message(
+                sent = await ctx.bot.send_message(
                     admin.id, case_text,
                     parse_mode=ParseMode.MARKDOWN, reply_markup=case_kb,
                     disable_notification=True,
                 )
+                await async_set_active_card(alert_id, admin.id, sent.message_id)
             except TelegramError:
                 pass
 

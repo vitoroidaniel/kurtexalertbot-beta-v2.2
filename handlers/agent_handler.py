@@ -20,6 +20,7 @@ from storage.case_store import (
     async_get_agent_stats                    as get_agent_stats,
     async_close_case                         as close_case,
     async_get_case                           as get_case,
+    async_set_active_card                    as set_active_card,
 )
 
 from storage.user_store import has_role
@@ -105,11 +106,12 @@ async def cmd_mycases(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     for case in active_only:
-        await update.message.reply_text(
+        sent = await update.message.reply_text(
             _active_case_text(case),
             parse_mode="Markdown",
             reply_markup=_active_case_keyboard(case["id"], case.get("status", "assigned")),
         )
+        await set_active_card(case["id"], sent.chat_id, sent.message_id)
 
 
 # ── /mystats ──────────────────────────────────────────────────────────────────
@@ -341,6 +343,7 @@ async def cb_solve_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             _active_case_text(case), parse_mode="Markdown",
             reply_markup=_active_case_keyboard(case["id"], case.get("status", "assigned")),
         )
+        await set_active_card(case["id"], query.message.chat_id, query.message.message_id)
     else:
         await query.edit_message_text("Case not found.", reply_markup=None)
 
@@ -420,6 +423,7 @@ async def cb_close_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             _active_case_text(case), parse_mode="Markdown",
             reply_markup=_active_case_keyboard(case["id"], case.get("status", "assigned")),
         )
+        await set_active_card(case["id"], query.message.chat_id, query.message.message_id)
     else:
         await query.edit_message_text("Case not found.", reply_markup=None)
 
@@ -437,11 +441,12 @@ async def _show_remaining_after(agent_id: int, delay: int = 0):
     if active_only:
         for c in active_only:
             try:
-                await bot.send_message(
+                sent = await bot.send_message(
                     agent_id, _active_case_text(c),
                     parse_mode="Markdown",
                     reply_markup=_active_case_keyboard(c["id"], c.get("status", "assigned")),
                 )
+                await set_active_card(c["id"], sent.chat_id, sent.message_id)
             except TelegramError:
                 pass
     else:
@@ -526,6 +531,7 @@ async def cb_delete_keep(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             _active_case_text(case), parse_mode="Markdown",
             reply_markup=_active_case_keyboard(case["id"], case.get("status", "assigned")),
         )
+        await set_active_card(case["id"], query.message.chat_id, query.message.message_id)
     else:
         await query.edit_message_text("Case not found.", reply_markup=None)
 
