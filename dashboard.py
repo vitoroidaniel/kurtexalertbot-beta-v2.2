@@ -2965,15 +2965,15 @@ REPORT_APP_HTML = r"""<!DOCTYPE html>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg: #121212; --surface: #1B1B1A; --surface-2: #232322; --raised: #292927;
-    --ink: #F3F0E8; --muted: #97917F; --line: #34322D;
-    --accent: #FF8A1E; --accent-ink: #1A1100;
+    --bg: #000000; --surface: #141414; --surface-2: #1E1E1E; --raised: #262626;
+    --ink: #FFFFFF; --muted: #A6A6A6; --line: #2C2C2C;
+    --accent: #FF8A1E; --accent-ink: #100A00;
     --ok: #3FC97C; --warn: #FFC53D; --danger: #FF5A4E;
     --stamp-low: #3FC97C; --stamp-med: #FFC53D; --stamp-high: #FF5A4E;
   }
   [data-scheme="light"]{
-    --bg: #EFEAdd; --surface: #FFFFFF; --surface-2: #F7F3E8; --raised: #FFFFFF;
-    --ink: #211C12; --muted: #756F5D; --line: #DED5BE;
+    --bg: #FFFFFF; --surface: #F5F5F5; --surface-2: #ECECEC; --raised: #FFFFFF;
+    --ink: #0A0A0A; --muted: #66686B; --line: #DEDEDE;
     --accent: #D9600A; --accent-ink: #FFFFFF;
     --ok: #1E9A57; --warn: #B8790A; --danger: #C93A2E;
     --stamp-low: #1E9A57; --stamp-med: #B8790A; --stamp-high: #C93A2E;
@@ -3304,15 +3304,46 @@ seg('seg-temprec', 'temp_recorder');
 seg('seg-priority', 'priority', updateStamp);
 
 document.getElementById('add-media').onclick = () => document.getElementById('file-input').click();
-document.getElementById('file-input').onchange = (e) => {
-  for(const f of e.target.files){
+document.getElementById('file-input').onchange = async (e) => {
+  const picked = Array.from(e.target.files);
+  e.target.value = '';
+  for(const f of picked){
     if(state.media.length >= 8){ break; }
     const kind = f.type.startsWith('video') ? 'video' : 'photo';
-    state.media.push({file: f, kind});
-    addThumb(f, kind);
+    // Phone camera photos can be several MB each — uncompressed uploads over
+    // a weak connection are what made the page look "frozen" before. Downscale
+    // stills client-side; leave videos as-is (compressing video in-browser is
+    // too slow/heavy to be worth it here).
+    const uploadFile = kind === 'photo' ? await compressImage(f) : f;
+    state.media.push({file: uploadFile, kind});
+    addThumb(uploadFile, kind);
   }
-  e.target.value = '';
 };
+
+function compressImage(file, maxDim = 1600, quality = 0.82){
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      let { width, height } = img;
+      if(width > maxDim || height > maxDim){
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob((blob) => {
+        if(!blob){ resolve(file); return; }  // fall back to original on failure
+        resolve(new File([blob], file.name || 'photo.jpg', { type: 'image/jpeg' }));
+      }, 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };  // fall back to original
+    img.src = url;
+  });
+}
 
 function addThumb(file, kind){
   const strip = document.getElementById('media-strip');
@@ -3402,6 +3433,8 @@ tg.MainButton.show();
 tg.MainButton.onClick(submit);
 
 async function submit(){
+  if(state.submitting) return;  // belt-and-suspenders: ignore re-entrant taps
+                                 // even if the UI looked frozen and MainButton.disable() hadn't visibly applied yet
   document.getElementById('err-box').style.display = 'none';
   const driver = document.getElementById('driver').value.trim();
   const issue  = document.getElementById('issue').value.trim();
@@ -3411,6 +3444,7 @@ async function submit(){
     return;
   }
 
+  state.submitting = true;
   tg.MainButton.showProgress(true);
   tg.MainButton.disable();
 
@@ -3447,6 +3481,7 @@ async function submit(){
     tg.MainButton.hide();
     setTimeout(() => tg.close(), 1400);
   }catch(err){
+    state.submitting = false;
     tg.MainButton.hideProgress();
     tg.MainButton.enable();
     showError(err.message || 'Something went wrong. Please try again.');
@@ -3543,13 +3578,15 @@ def api_webapp_submit_report():
         if not case_id:
             return jsonify({"ok": False, "error": "Missing case."}), 400
 
-        from storage.case_store import get_case, report_case, update_case_fields
+        from storage.case_store import get_case, claim_case_for_report, update_case_fields
         from storage.fleet_store import get_or_create_unit
         from handlers.report_handler import _build_report
 
         case = get_case(case_id)
-        if not case or case.get("status") != "assigned":
-            msg = "This case was already reported." if case and case.get("status") == "reported" else "This case is no longer active."
+        if not case:
+            return jsonify({"ok": False, "error": "This case is no longer active."}), 409
+        if case.get("status") != "assigned":
+            msg = "This case was already reported." if case.get("status") == "reported" else "This case is no longer active."
             return jsonify({"ok": False, "error": msg}), 409
 
         handler_name = f"{user.get('first_name','')} {user.get('last_name') or ''}".strip() or user.get("username", "Agent")
@@ -3576,6 +3613,16 @@ def api_webapp_submit_report():
         dest_id = os.getenv("REPORTS_GROUP_ID")
         if not dest_id:
             return jsonify({"ok": False, "error": "No reports group configured."}), 500
+
+        # Atomic claim, as late as possible — right before we actually attempt
+        # to send anything. If this case was already flipped to "reported" by
+        # another in-flight request (e.g. a slow upload that got double-tapped
+        # after the page froze), this fails here and we stop cleanly: nothing
+        # gets sent twice, regardless of timing.
+        if not claim_case_for_report(case_id):
+            fresh = get_case(case_id)
+            msg = "This case was already reported." if fresh and fresh.get("status") == "reported" else "This case is no longer active."
+            return jsonify({"ok": False, "error": msg}), 409
 
         import requests as _requests
         api = f"https://api.telegram.org/bot{BOT_TOKEN}"
@@ -3629,10 +3676,16 @@ def api_webapp_submit_report():
                 resp.raise_for_status()
         except Exception as e:
             logger.error(f"webapp submit_report send failed: {e}")
-            return jsonify({"ok": False, "error": "Failed to deliver report to the reports group."}), 502
+            # We already claimed the case as "reported" before sending — since
+            # the send itself failed, undo that so the agent isn't permanently
+            # locked out of retrying.
+            try:
+                update_case_fields(case_id, status="assigned")
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "Failed to deliver report to the reports group. Please try again."}), 502
 
         try:
-            report_case(case_id)
             vtype       = data["vehicle_type"]
             unit_number = data["unit_number"]
             fleet_fk    = {"truck": "truck_id", "trailer": "trailer_id", "reefer": "reefer_id"}.get(vtype)
@@ -3658,10 +3711,14 @@ def api_webapp_submit_report():
 
         _clear_draft(case_id, user["id"])
 
+        group_name = case.get("group_name") or "—"
+
         # Strip the buttons off whichever "Active Case" card is currently
         # showing for this case, so it can't be tapped into a second, duplicate
         # report. We track the most recently sent copy in the kv table (see
-        # storage.case_store.set_active_card / get_active_card).
+        # storage.case_store.set_active_card / get_active_card). Keep this
+        # short — the full report already went to the reports group, no need
+        # to also dump it into the agent's own DM with the bot.
         try:
             from storage.case_store import get_active_card, clear_active_card
             card = get_active_card(case_id)
@@ -3671,23 +3728,22 @@ def api_webapp_submit_report():
                     data={
                         "chat_id": card["chat_id"],
                         "message_id": card["message_id"],
-                        "text": "✅ *Reported*\n\n" + report_text,
+                        "text": f"✅ Report for *{group_name}* sent",
                         "parse_mode": "Markdown",
                     },
                     timeout=10,
                 )
                 clear_active_card(case_id)
+            else:
+                # No tracked card (e.g. reported from an older message we
+                # didn't tag) — fall back to a short standalone confirmation.
+                _requests.post(
+                    f"{api}/sendMessage",
+                    data={"chat_id": user["id"], "text": f"✅ Report for {group_name} sent", "disable_notification": True},
+                    timeout=10,
+                )
         except Exception as e:
             logger.error(f"webapp submit_report card cleanup failed: {e}")
-
-        try:
-            _requests.post(
-                f"{api}/sendMessage",
-                data={"chat_id": user["id"], "text": "✅ Report sent!", "disable_notification": True},
-                timeout=10,
-            )
-        except Exception:
-            pass
 
         return jsonify({"ok": True})
     except Exception as e:

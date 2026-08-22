@@ -128,6 +128,21 @@ def report_case(case_id: str, notes: Optional[str] = "case reported") -> Optiona
     return get_case(case_id)
 
 
+def claim_case_for_report(case_id: str, notes: Optional[str] = "case reported") -> bool:
+    """Atomically flips assigned -> reported. Only ONE of several concurrent
+    calls (e.g. a slow upload that got double-submitted from the client) can
+    ever succeed — the rest see rowcount 0 and must not proceed to send
+    anything. This must run BEFORE any Telegram sends, not after, or a race
+    can still slip a duplicate report out even though only one DB row wins."""
+    conn = get_conn()
+    cur = conn.execute(
+        "UPDATE cases SET status='reported', notes=? WHERE id=? AND status='assigned'",
+        (notes, case_id),
+    )
+    conn.commit()
+    return cur.rowcount > 0
+
+
 def close_case(case_id: str, notes: Optional[str] = None) -> Optional[dict]:
     conn = get_conn()
     row = conn.execute("SELECT assigned_at FROM cases WHERE id = ?", (case_id,)).fetchone()
