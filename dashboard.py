@@ -3571,7 +3571,7 @@ def api_webapp_submit_report():
         }
         report_text = _build_report(data)
 
-        dest_id = config.REPORTS_GROUP_ID
+        dest_id = os.getenv("REPORTS_GROUP_ID")
         if not dest_id:
             return jsonify({"ok": False, "error": "No reports group configured."}), 500
 
