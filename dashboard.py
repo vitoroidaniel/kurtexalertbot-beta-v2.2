@@ -2959,133 +2959,250 @@ REPORT_APP_HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Report</title>
+<title>Case Report</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg: var(--tg-theme-bg-color, #0e0e10);
-    --sec-bg: var(--tg-theme-secondary-bg-color, #17171a);
-    --text: var(--tg-theme-text-color, #f2f2f2);
-    --hint: var(--tg-theme-hint-color, #8a8a8e);
-    --link: var(--tg-theme-link-color, #5aa7ff);
-    --btn: var(--tg-theme-button-color, #2ea6ff);
-    --btn-text: var(--tg-theme-button-text-color, #ffffff);
-    --accent-green: #34c759;
-    --accent-yellow: #ffcc00;
-    --accent-red: #ff453a;
+    --bg: #121212; --surface: #1B1B1A; --surface-2: #232322; --raised: #292927;
+    --ink: #F3F0E8; --muted: #97917F; --line: #34322D;
+    --accent: #FF8A1E; --accent-ink: #1A1100;
+    --ok: #3FC97C; --warn: #FFC53D; --danger: #FF5A4E;
+    --stamp-low: #3FC97C; --stamp-med: #FFC53D; --stamp-high: #FF5A4E;
   }
-  *{box-sizing:border-box;}
+  [data-scheme="light"]{
+    --bg: #EFEAdd; --surface: #FFFFFF; --surface-2: #F7F3E8; --raised: #FFFFFF;
+    --ink: #211C12; --muted: #756F5D; --line: #DED5BE;
+    --accent: #D9600A; --accent-ink: #FFFFFF;
+    --ok: #1E9A57; --warn: #B8790A; --danger: #C93A2E;
+    --stamp-low: #1E9A57; --stamp-med: #B8790A; --stamp-high: #C93A2E;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{background:var(--bg);}
   body{
-    margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-    background:var(--bg); color:var(--text); padding:12px 14px 100px;
+    margin:0; font-family:'Inter',-apple-system,sans-serif;
+    background:var(--bg); color:var(--ink); padding:14px 14px 110px;
+    transition:background .2s;
   }
-  h1{font-size:17px; margin:4px 0 2px;}
-  .sub{color:var(--hint); font-size:13px; margin-bottom:14px; line-height:1.4;}
-  .card{background:var(--sec-bg); border-radius:14px; padding:14px; margin-bottom:12px;}
-  .label{font-size:13px; color:var(--hint); margin-bottom:6px; font-weight:600; text-transform:uppercase; letter-spacing:.3px;}
-  .seg{display:flex; gap:8px; margin-bottom:4px;}
-  .seg button{
-    flex:1; padding:10px 6px; border-radius:10px; border:1.5px solid transparent;
-    background:var(--bg); color:var(--text); font-size:14px; font-weight:600; cursor:pointer;
+  .eyebrow{
+    font-family:'Oswald',sans-serif; font-size:11px; font-weight:600; letter-spacing:1.6px;
+    text-transform:uppercase; color:var(--muted);
   }
-  .seg button.active{border-color:var(--btn); background:var(--btn); color:var(--btn-text);}
-  input[type=text], textarea{
-    width:100%; padding:11px 12px; border-radius:10px; border:none;
-    background:var(--bg); color:var(--text); font-size:15px; font-family:inherit;
-    margin-bottom:2px;
+  .mono{font-family:'JetBrains Mono',ui-monospace,monospace;}
+
+  /* ---- Ticket header: torn work-order stub ---- */
+  .ticket{
+    position:relative; background:var(--surface); border-radius:16px 16px 4px 4px;
+    padding:16px 16px 18px; margin-bottom:16px; border:1px solid var(--line);
   }
-  textarea{resize:vertical; min-height:60px;}
-  input::placeholder, textarea::placeholder{color:var(--hint);}
-  .field{margin-bottom:12px;}
+  .ticket::after{
+    content:""; position:absolute; left:0; right:0; bottom:-9px; height:18px;
+    background:
+      radial-gradient(circle 5px at 14px 0, transparent 5px, var(--bg) 5.5px) top left/28px 18px repeat-x,
+      var(--surface);
+    -webkit-mask: linear-gradient(#000,#000) top/100% 9px no-repeat;
+            mask: linear-gradient(#000,#000) top/100% 9px no-repeat;
+    border-radius:0 0 4px 4px;
+  }
+  .ticket-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+  .ticket-id{font-size:11px; color:var(--muted);}
+  .ticket-id b{color:var(--ink); font-weight:600;}
+  .ticket h1{
+    font-family:'Oswald',sans-serif; font-size:19px; font-weight:600; margin:8px 0 2px;
+    letter-spacing:.2px;
+  }
+  .ticket .meta{color:var(--muted); font-size:13px; line-height:1.5;}
+
+  /* ---- Priority stamp ---- */
+  .stamp{
+    font-family:'Oswald',sans-serif; font-size:11px; font-weight:700; letter-spacing:1.4px;
+    text-transform:uppercase; padding:6px 10px; border-radius:7px;
+    border:2px solid currentColor; transform:rotate(-6deg); white-space:nowrap;
+    flex-shrink:0;
+  }
+  .stamp.low{color:var(--stamp-low);}
+  .stamp.medium{color:var(--stamp-med);}
+  .stamp.high{color:var(--stamp-high);}
+
+  /* ---- Cards ---- */
+  .card{
+    background:var(--surface); border:1px solid var(--line); border-radius:14px;
+    padding:14px; margin-bottom:12px;
+  }
+  .card-head{display:flex; align-items:center; gap:8px; margin-bottom:12px;}
+  .card-head .ic{color:var(--accent); flex-shrink:0;}
+  .card-head .lbl{
+    font-family:'Oswald',sans-serif; font-size:12px; font-weight:600; letter-spacing:1.1px;
+    text-transform:uppercase; color:var(--muted);
+  }
+
+  .field{margin-bottom:11px;}
   .field:last-child{margin-bottom:0;}
+  .field-label{font-size:12px; color:var(--muted); margin-bottom:5px; font-weight:500;}
+  input[type=text], textarea{
+    width:100%; padding:11px 12px; border-radius:9px; border:1px solid var(--line);
+    background:var(--surface-2); color:var(--ink); font-size:15px; font-family:inherit;
+  }
+  input[type=text]:focus, textarea:focus{outline:2px solid var(--accent); outline-offset:-1px; border-color:var(--accent);}
+  input.mono-field{font-family:'JetBrains Mono',ui-monospace,monospace; letter-spacing:.3px;}
+  textarea{resize:vertical; min-height:58px; font-family:inherit;}
+  input::placeholder, textarea::placeholder{color:var(--muted); opacity:.7;}
   .hidden{display:none !important;}
-  .media-strip{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;}
-  .thumb{position:relative; width:64px; height:64px; border-radius:10px; overflow:hidden; background:var(--bg);}
+
+  /* ---- Segmented controls ---- */
+  .seg{display:flex; gap:6px;}
+  .seg button{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:5px;
+    padding:10px 4px; border-radius:10px; border:1px solid var(--line);
+    background:var(--surface-2); color:var(--muted); font-size:12.5px; font-weight:600;
+    cursor:pointer; font-family:'Inter',sans-serif; transition:.12s;
+  }
+  .seg button svg{width:18px; height:18px;}
+  .seg button.active{border-color:var(--accent); background:var(--accent); color:var(--accent-ink);}
+  .seg.wrap{flex-wrap:wrap;}
+  .seg.wrap button{flex:1 1 calc(50% - 3px); min-width:calc(50% - 3px); flex-direction:row; justify-content:center;}
+
+  .prio{display:flex; gap:6px;}
+  .prio button{
+    flex:1; padding:9px 4px; border-radius:9px; border:1.5px solid; font-size:12.5px;
+    font-weight:700; cursor:pointer; background:transparent; font-family:'Oswald',sans-serif;
+    letter-spacing:.4px; text-transform:uppercase;
+  }
+  .prio button[data-v=low]{color:var(--stamp-low); border-color:var(--stamp-low);}
+  .prio button[data-v=medium]{color:var(--stamp-med); border-color:var(--stamp-med);}
+  .prio button[data-v=high]{color:var(--stamp-high); border-color:var(--stamp-high);}
+  .prio button.active{color:var(--bg) !important;}
+  .prio button.active[data-v=low]{background:var(--stamp-low);}
+  .prio button.active[data-v=medium]{background:var(--stamp-med);}
+  .prio button.active[data-v=high]{background:var(--stamp-high);}
+
+  /* ---- Media strip ---- */
+  .media-strip{display:flex; gap:8px; flex-wrap:wrap;}
+  .thumb{position:relative; width:66px; height:66px; border-radius:10px; overflow:hidden; background:var(--surface-2); border:1px solid var(--line);}
   .thumb img, .thumb video{width:100%; height:100%; object-fit:cover;}
   .thumb .x{
-    position:absolute; top:2px; right:2px; width:18px; height:18px; border-radius:50%;
-    background:rgba(0,0,0,.6); color:#fff; font-size:12px; line-height:18px; text-align:center; cursor:pointer;
+    position:absolute; top:3px; right:3px; width:18px; height:18px; border-radius:50%;
+    background:rgba(0,0,0,.65); color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer;
   }
+  .thumb .x svg{width:10px; height:10px;}
   .add-media{
-    width:64px; height:64px; border-radius:10px; border:1.5px dashed var(--hint);
-    display:flex; align-items:center; justify-content:center; font-size:24px; color:var(--hint); cursor:pointer;
+    width:66px; height:66px; border-radius:10px; border:1.5px dashed var(--line);
+    display:flex; align-items:center; justify-content:center; color:var(--muted); cursor:pointer; background:var(--surface-2);
   }
-  .prio{display:flex; gap:8px;}
-  .prio button{flex:1; padding:10px 4px; border-radius:10px; border:1.5px solid transparent; font-size:13px; font-weight:600; cursor:pointer; color:#fff;}
-  .prio button[data-v=low]{background:rgba(52,199,89,.18); color:var(--accent-green);}
-  .prio button[data-v=medium]{background:rgba(255,204,0,.18); color:var(--accent-yellow);}
-  .prio button[data-v=high]{background:rgba(255,69,58,.18); color:var(--accent-red);}
-  .prio button.active[data-v=low]{background:var(--accent-green); color:#08210f;}
-  .prio button.active[data-v=medium]{background:var(--accent-yellow); color:#332900;}
-  .prio button.active[data-v=high]{background:var(--accent-red); color:#2b0503;}
-  .err{color:var(--accent-red); font-size:13px; margin-top:8px; display:none;}
-  .done-screen{text-align:center; padding-top:80px;}
-  .done-screen .icon{font-size:56px; margin-bottom:12px;}
+
+  .err{
+    color:var(--danger); font-size:13px; margin-top:6px; padding:10px 12px;
+    background:color-mix(in srgb, var(--danger) 12%, transparent); border-radius:9px; display:none;
+  }
+  .draft-note{
+    display:flex; align-items:center; gap:7px; font-size:12px; color:var(--muted);
+    background:var(--surface-2); border:1px solid var(--line); border-radius:10px;
+    padding:9px 11px; margin-bottom:14px;
+  }
+  .draft-note svg{width:14px; height:14px; color:var(--accent); flex-shrink:0;}
+
+  .done-screen{text-align:center; padding-top:110px;}
+  .done-screen .ic{color:var(--ok); margin-bottom:14px;}
+  .done-screen h2{font-family:'Oswald',sans-serif; font-size:18px; margin:0 0 4px;}
+  .done-screen p{color:var(--muted); font-size:13px;}
 </style>
 </head>
 <body>
 
 <div id="form-view">
-  <h1>📋 Case Report</h1>
-  <div class="sub">{{ driver_name }} — {{ group_name }}<br>{{ issue_preview }}</div>
+  <div class="ticket">
+    <div class="ticket-top">
+      <div>
+        <div class="ticket-id mono">CASE <b>#{{ case_id[:8] }}</b></div>
+        <h1>Case Report</h1>
+        <div class="meta">{{ driver_name }} — {{ group_name }}<br>{{ issue_preview }}</div>
+      </div>
+      <div class="stamp low" id="prio-stamp">🟢 Low</div>
+    </div>
+  </div>
+
+  <div class="draft-note hidden" id="draft-note">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+    <span>Restored your unfinished report — pick up where you left off.</span>
+  </div>
 
   <div class="card">
-    <div class="label">Vehicle Type</div>
+    <div class="card-head">
+      <svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l4 4v4h-2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+      <div class="lbl">Vehicle</div>
+    </div>
     <div class="seg" id="seg-type">
-      <button data-v="truck" class="active">🚛 Truck</button>
-      <button data-v="trailer">🚚 Trailer</button>
-      <button data-v="reefer">❄️ Reefer</button>
+      <button data-v="truck" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l4 4v4h-2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+        Truck
+      </button>
+      <button data-v="trailer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="15" height="10" rx="1"/><path d="M17 10h3l2 2.5V17h-5"/><circle cx="6" cy="17" r="2"/><circle cx="17.5" cy="17" r="2"/></svg>
+        Trailer
+      </button>
+      <button data-v="reefer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20M5 5l14 14M19 5 5 19"/></svg>
+        Reefer
+      </button>
     </div>
   </div>
 
   <div class="card">
     <div class="field">
-      <div class="label" id="unit-label">Truck Number</div>
-      <input type="text" id="unit_number" placeholder="e.g. 4471">
+      <div class="field-label" id="unit-label">Truck number</div>
+      <input type="text" id="unit_number" class="mono-field" placeholder="e.g. 4471">
     </div>
     <div class="field">
-      <div class="label">Driver</div>
+      <div class="field-label">Driver</div>
       <input type="text" id="driver" placeholder="Driver name">
     </div>
     <div class="field">
-      <div class="label">Issue</div>
+      <div class="field-label">Issue</div>
       <textarea id="issue" placeholder="Describe the issue"></textarea>
     </div>
   </div>
 
   <div class="card">
-    <div class="label">Load Type</div>
-    <div class="seg" id="seg-load">
+    <div class="card-head">
+      <svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12"/></svg>
+      <div class="lbl">Load</div>
+    </div>
+    <div class="seg wrap" id="seg-load">
       <button data-v="JBS Load" class="active">JBS</button>
       <button data-v="Broker Load">Broker</button>
       <button data-v="Meijer Load">Meijer</button>
       <button data-v="Empty">Empty</button>
     </div>
     <div class="field" id="wrap-pickup" style="margin-top:12px;">
-      <div class="label">Pick up Location / Time</div>
+      <div class="field-label">Pick up location / time</div>
       <input type="text" id="pickup" placeholder="Optional">
     </div>
     <div class="field" id="wrap-delivery">
-      <div class="label">Delivery Location / Time</div>
+      <div class="field-label">Delivery location / time</div>
       <input type="text" id="delivery" placeholder="Optional">
     </div>
     <div class="field">
-      <div class="label">Current Location</div>
+      <div class="field-label">Current location</div>
       <input type="text" id="location" placeholder="Optional">
     </div>
   </div>
 
   <div class="card hidden" id="card-reefer">
-    <div class="field">
-      <div class="label">Setpoint Temperature</div>
-      <input type="text" id="setpoint" placeholder="e.g. -10°C">
+    <div class="card-head">
+      <svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4v16M10 4v16M4 7l16 10M4 17 20 7"/></svg>
+      <div class="lbl">Reefer temp</div>
     </div>
     <div class="field">
-      <div class="label">Current Temperature</div>
-      <input type="text" id="current_temp" placeholder="e.g. -8°C">
+      <div class="field-label">Setpoint temperature</div>
+      <input type="text" id="setpoint" class="mono-field" placeholder="e.g. -10°C">
     </div>
     <div class="field">
-      <div class="label">Temp Recorder</div>
+      <div class="field-label">Current temperature</div>
+      <input type="text" id="current_temp" class="mono-field" placeholder="e.g. -8°C">
+    </div>
+    <div class="field">
+      <div class="field-label">Temp recorder</div>
       <div class="seg" id="seg-temprec">
         <button data-v="Y">Yes</button>
         <button data-v="N" class="active">No</button>
@@ -3094,24 +3211,35 @@ REPORT_APP_HTML = r"""<!DOCTYPE html>
   </div>
 
   <div class="card">
-    <div class="label">Comments</div>
+    <div class="card-head">
+      <svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <div class="lbl">Comments</div>
+    </div>
     <textarea id="comments" placeholder="Optional"></textarea>
   </div>
 
   <div class="card">
-    <div class="label">Photos / Videos</div>
+    <div class="card-head">
+      <svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      <div class="lbl">Photos / videos</div>
+    </div>
     <div class="media-strip" id="media-strip">
-      <div class="add-media" id="add-media">+</div>
+      <div class="add-media" id="add-media">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      </div>
     </div>
     <input type="file" id="file-input" accept="image/*,video/*" multiple capture="environment" class="hidden">
   </div>
 
   <div class="card">
-    <div class="label">Priority</div>
+    <div class="card-head">
+      <svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4M12 17h.01"/></svg>
+      <div class="lbl">Priority</div>
+    </div>
     <div class="prio" id="seg-priority">
-      <button data-v="low" class="active">🟢 Low</button>
-      <button data-v="medium">🟡 Medium</button>
-      <button data-v="high">🔴 High</button>
+      <button data-v="low" class="active">Low</button>
+      <button data-v="medium">Medium</button>
+      <button data-v="high">High</button>
     </div>
   </div>
 
@@ -3119,21 +3247,29 @@ REPORT_APP_HTML = r"""<!DOCTYPE html>
 </div>
 
 <div id="done-view" class="done-screen hidden">
-  <div class="icon">✅</div>
-  <div style="font-size:16px; font-weight:600;">Report sent</div>
-  <div class="sub">You can close this window now.</div>
+  <svg class="ic" width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg>
+  <h2>Report sent</h2>
+  <p>You can close this window now.</p>
 </div>
 
 <script>
 const tg = window.Telegram.WebApp;
 tg.ready();
 tg.expand();
+document.body.dataset.scheme = tg.colorScheme || 'dark';
+tg.onEvent('themeChanged', () => document.body.dataset.scheme = tg.colorScheme || 'dark');
 
 const CASE_ID = {{ case_id|tojson }};
+const DRAFT_KEY = 'kurtex_draft_' + CASE_ID;
 const state = {
   vehicle_type: "truck", load: "JBS Load", temp_recorder: "N", priority: "low",
-  media: []  // {file, kind}
+  media: []  // {file, kind} — not persisted across reloads, only text fields are
 };
+
+// Try to hand the native bottom button our accent color so it feels part of the same system.
+try{
+  tg.MainButton.setParams({ color: '#FF8A1E', text_color: '#1A1100' });
+}catch(e){}
 
 function seg(id, key, onchange){
   document.querySelectorAll('#'+id+' button').forEach(b=>{
@@ -3142,12 +3278,20 @@ function seg(id, key, onchange){
       b.classList.add('active');
       state[key] = b.dataset.v;
       if(onchange) onchange(b.dataset.v);
+      scheduleSave();
     };
   });
 }
 
+function updateStamp(){
+  const stamp = document.getElementById('prio-stamp');
+  const meta = {low:['🟢','Low'], medium:['🟡','Medium'], high:['🔴','High']}[state.priority];
+  stamp.className = 'stamp ' + state.priority;
+  stamp.textContent = meta[0] + ' ' + meta[1];
+}
+
 seg('seg-type', 'vehicle_type', v => {
-  document.getElementById('unit-label').textContent = v === 'trailer' ? 'Trailer Number' : (v === 'reefer' ? 'Reefer / Trailer Number' : 'Truck Number');
+  document.getElementById('unit-label').textContent = v === 'trailer' ? 'Trailer number' : (v === 'reefer' ? 'Reefer / trailer number' : 'Truck number');
   document.getElementById('card-reefer').classList.toggle('hidden', !(v === 'reefer' && state.load !== 'Empty'));
 });
 seg('seg-load', 'load', v => {
@@ -3157,7 +3301,7 @@ seg('seg-load', 'load', v => {
   document.getElementById('card-reefer').classList.toggle('hidden', !(state.vehicle_type === 'reefer' && !isEmpty));
 });
 seg('seg-temprec', 'temp_recorder');
-seg('seg-priority', 'priority');
+seg('seg-priority', 'priority', updateStamp);
 
 document.getElementById('add-media').onclick = () => document.getElementById('file-input').click();
 document.getElementById('file-input').onchange = (e) => {
@@ -3176,11 +3320,10 @@ function addThumb(file, kind){
   const div = document.createElement('div');
   div.className = 'thumb';
   const url = URL.createObjectURL(file);
-  div.innerHTML = kind === 'video'
-    ? `<video src="${url}" muted></video>`
-    : `<img src="${url}">`;
+  div.innerHTML = kind === 'video' ? `<video src="${url}" muted></video>` : `<img src="${url}">`;
   const x = document.createElement('div');
-  x.className = 'x'; x.textContent = '✕';
+  x.className = 'x';
+  x.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 6 6 18M6 6l12 12"/></svg>';
   x.onclick = () => {
     const idx = state.media.findIndex(m => m.file === file);
     if(idx > -1) state.media.splice(idx, 1);
@@ -3195,6 +3338,64 @@ function showError(msg){
   box.textContent = msg;
   box.style.display = 'block';
 }
+
+// ---- Draft persistence: text fields only (media can't survive a reload as files) ----
+const TEXT_FIELDS = ['unit_number','driver','issue','pickup','delivery','location','setpoint','current_temp','comments'];
+
+function collectDraft(){
+  const d = { ...state };
+  delete d.media;
+  TEXT_FIELDS.forEach(id => d[id] = document.getElementById(id).value);
+  return d;
+}
+
+function applyDraft(d){
+  if(!d) return;
+  if(d.vehicle_type) document.querySelector(`#seg-type button[data-v="${d.vehicle_type}"]`)?.click();
+  if(d.load) document.querySelector(`#seg-load button[data-v="${d.load}"]`)?.click();
+  if(d.temp_recorder) document.querySelector(`#seg-temprec button[data-v="${d.temp_recorder}"]`)?.click();
+  if(d.priority) document.querySelector(`#seg-priority button[data-v="${d.priority}"]`)?.click();
+  TEXT_FIELDS.forEach(id => { if(d[id]) document.getElementById(id).value = d[id]; });
+}
+
+let saveTimer = null;
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveDraft, 700);
+}
+async function saveDraft(){
+  const payload = JSON.stringify(collectDraft());
+  try{ localStorage.setItem(DRAFT_KEY, payload); }catch(e){}
+  try{
+    const fd = new FormData();
+    fd.append('init_data', tg.initData);
+    fd.append('case_id', CASE_ID);
+    fd.append('payload', payload);
+    await fetch('/api/webapp/save_draft', { method: 'POST', body: fd });
+  }catch(e){}
+}
+
+async function loadDraft(){
+  let draft = null;
+  try{
+    const fd = new FormData();
+    fd.append('init_data', tg.initData);
+    fd.append('case_id', CASE_ID);
+    const res = await fetch('/api/webapp/get_draft', { method: 'POST', body: fd });
+    const data = await res.json();
+    if(data.ok && data.draft) draft = JSON.parse(data.draft);
+  }catch(e){}
+  if(!draft){
+    try{ const local = localStorage.getItem(DRAFT_KEY); if(local) draft = JSON.parse(local); }catch(e){}
+  }
+  if(draft){
+    applyDraft(draft);
+    document.getElementById('draft-note').classList.remove('hidden');
+  }
+}
+loadDraft();
+
+document.querySelectorAll('input[type=text], textarea').forEach(el => el.addEventListener('input', scheduleSave));
 
 tg.MainButton.setText('Send Report');
 tg.MainButton.show();
@@ -3233,10 +3434,13 @@ async function submit(){
 
   try{
     const res = await fetch('/api/webapp/submit_report', { method: 'POST', body: fd });
-    const data = await res.json();
+    let data;
+    try{ data = await res.json(); }
+    catch(parseErr){ throw new Error('Server error (HTTP ' + res.status + '). Please try again.'); }
     if(!res.ok || !data.ok){
       throw new Error(data.error || 'Failed to send report.');
     }
+    try{ localStorage.removeItem(DRAFT_KEY); }catch(e){}
     tg.HapticFeedback.notificationOccurred('success');
     document.getElementById('form-view').classList.add('hidden');
     document.getElementById('done-view').classList.remove('hidden');
@@ -3274,139 +3478,197 @@ def report_app():
     )
 
 
-@app.route("/api/webapp/submit_report", methods=["POST"])
-def api_webapp_submit_report():
-    init_data = request.form.get("init_data", "")
-    user = verify_webapp_init_data(init_data)
-    if not user:
-        return jsonify({"ok": False, "error": "Could not verify Telegram session. Please reopen from the bot."}), 401
-
-    case_id = request.form.get("case_id", "").strip()
-    if not case_id:
-        return jsonify({"ok": False, "error": "Missing case."}), 400
-
-    from storage.case_store import get_case, report_case, update_case_fields
-    from storage.fleet_store import get_or_create_unit
-    from handlers.report_handler import _build_report
-
-    case = get_case(case_id)
-    if not case or case.get("status") not in ("assigned", "reported"):
-        return jsonify({"ok": False, "error": "This case is no longer active."}), 409
-
-    handler_name = f"{user.get('first_name','')} {user.get('last_name') or ''}".strip() or user.get("username", "Agent")
-
-    f = request.form
-    data = {
-        "vehicle_type":   f.get("vehicle_type", "truck"),
-        "unit_number":    f.get("unit_number", ""),
-        "driver":         f.get("driver", ""),
-        "issue":          f.get("issue", ""),
-        "load":           f.get("load", ""),
-        "pickup":         f.get("pickup") or "—",
-        "delivery":       f.get("delivery") or "—",
-        "location":       f.get("location") or "—",
-        "setpoint":       f.get("setpoint") or "—",
-        "current_temp":   f.get("current_temp") or "—",
-        "temp_recorder":  f.get("temp_recorder", "N"),
-        "comments":       f.get("comments", ""),
-        "priority":       f.get("priority", "low"),
-        "handler":        handler_name,
-    }
-    report_text = _build_report(data)
-
-    dest_id = config.REPORTS_GROUP_ID
-    if not dest_id:
-        return jsonify({"ok": False, "error": "No reports group configured."}), 500
-
-    import requests as _requests
-    api = f"https://api.telegram.org/bot{BOT_TOKEN}"
-    files = request.files.getlist("media")
-
-    def _kind_for(file_storage):
-        mt = (file_storage.mimetype or "").lower()
-        if mt.startswith("video"):
-            return "sendVideo", "video"
-        if mt.startswith("image"):
-            return "sendPhoto", "photo"
-        return "sendDocument", "document"
-
+@app.route("/api/webapp/save_draft", methods=["POST"])
+def api_webapp_save_draft():
     try:
-        if files:
-            first = files[0]
-            method, field = _kind_for(first)
-            resp = _requests.post(
-                f"{api}/{method}",
-                data={"chat_id": dest_id, "caption": report_text, "parse_mode": "Markdown"},
-                files={field: (first.filename, first.stream, first.mimetype)},
-                timeout=30,
-            )
-            if not resp.ok:
-                # Markdown escaping issue or similar — fall back to plain caption
-                first.stream.seek(0)
-                resp = _requests.post(
-                    f"{api}/{method}",
-                    data={"chat_id": dest_id, "caption": report_text[:1024]},
-                    files={field: (first.filename, first.stream, first.mimetype)},
-                    timeout=30,
-                )
-                resp.raise_for_status()
-            for extra in files[1:]:
-                method, field = _kind_for(extra)
-                try:
-                    _requests.post(
-                        f"{api}/{method}",
-                        data={"chat_id": dest_id},
-                        files={field: (extra.filename, extra.stream, extra.mimetype)},
-                        timeout=30,
-                    )
-                except Exception as e:
-                    logger.error(f"webapp extra media failed: {e}")
-        else:
-            resp = _requests.post(
-                f"{api}/sendMessage",
-                data={"chat_id": dest_id, "text": report_text, "parse_mode": "Markdown"},
-                timeout=15,
-            )
-            resp.raise_for_status()
-    except Exception as e:
-        logger.error(f"webapp submit_report send failed: {e}")
-        return jsonify({"ok": False, "error": "Failed to deliver report to the reports group."}), 502
-
-    try:
-        report_case(case_id)
-        vtype       = data["vehicle_type"]
-        unit_number = data["unit_number"]
-        fleet_fk    = {"truck": "truck_id", "trailer": "trailer_id", "reefer": "reefer_id"}.get(vtype)
-        fleet_fields = {}
-        if fleet_fk and unit_number:
-            unit_id = get_or_create_unit(unit_number, vtype)
-            if unit_id:
-                fleet_fields[fleet_fk] = unit_id
-        update_case_fields(
-            case_id,
-            vehicle_type=vtype, unit_number=unit_number,
-            report_driver=data["driver"], issue_text=data["issue"],
-            load_type=data["load"], location=data["location"],
-            priority=data["priority"], pickup=data["pickup"], delivery=data["delivery"],
-            comments=data["comments"], setpoint=data["setpoint"],
-            current_temp=data["current_temp"], temp_recorder=data["temp_recorder"],
-            **fleet_fields,
+        user = verify_webapp_init_data(request.form.get("init_data", ""))
+        if not user:
+            return jsonify({"ok": False}), 401
+        case_id = request.form.get("case_id", "").strip()
+        payload = request.form.get("payload", "")
+        if not case_id or not payload:
+            return jsonify({"ok": False}), 400
+        from storage.db import get_conn
+        conn = get_conn()
+        key = f"report_draft:{case_id}:{user['id']}"
+        conn.execute(
+            "INSERT INTO kv (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (key, payload),
         )
+        conn.commit()
+        return jsonify({"ok": True})
     except Exception as e:
-        logger.error(f"webapp submit_report DB update failed: {e}")
-        # Report already reached the reports group — don't fail the request over
-        # analytics bookkeeping, just log it.
+        logger.error(f"save_draft error: {e}")
+        return jsonify({"ok": False}), 500
 
+
+@app.route("/api/webapp/get_draft", methods=["POST"])
+def api_webapp_get_draft():
     try:
-        _requests.post(
-            f"{api}/sendMessage",
-            data={"chat_id": user["id"], "text": "✅ Report sent!", "disable_notification": True},
-            timeout=10,
-        )
+        user = verify_webapp_init_data(request.form.get("init_data", ""))
+        if not user:
+            return jsonify({"ok": False}), 401
+        case_id = request.form.get("case_id", "").strip()
+        from storage.db import get_conn
+        conn = get_conn()
+        key = f"report_draft:{case_id}:{user['id']}"
+        row = conn.execute("SELECT value FROM kv WHERE key=?", (key,)).fetchone()
+        return jsonify({"ok": True, "draft": row["value"] if row else None})
+    except Exception as e:
+        logger.error(f"get_draft error: {e}")
+        return jsonify({"ok": False, "draft": None}), 500
+
+
+def _clear_draft(case_id, user_id):
+    try:
+        from storage.db import get_conn
+        conn = get_conn()
+        conn.execute("DELETE FROM kv WHERE key=?", (f"report_draft:{case_id}:{user_id}",))
+        conn.commit()
     except Exception:
         pass
 
-    return jsonify({"ok": True})
+
+@app.route("/api/webapp/submit_report", methods=["POST"])
+def api_webapp_submit_report():
+    try:
+        init_data = request.form.get("init_data", "")
+        user = verify_webapp_init_data(init_data)
+        if not user:
+            return jsonify({"ok": False, "error": "Could not verify Telegram session. Please reopen from the bot."}), 401
+
+        case_id = request.form.get("case_id", "").strip()
+        if not case_id:
+            return jsonify({"ok": False, "error": "Missing case."}), 400
+
+        from storage.case_store import get_case, report_case, update_case_fields
+        from storage.fleet_store import get_or_create_unit
+        from handlers.report_handler import _build_report
+
+        case = get_case(case_id)
+        if not case or case.get("status") not in ("assigned", "reported"):
+            return jsonify({"ok": False, "error": "This case is no longer active."}), 409
+
+        handler_name = f"{user.get('first_name','')} {user.get('last_name') or ''}".strip() or user.get("username", "Agent")
+
+        f = request.form
+        data = {
+            "vehicle_type":   f.get("vehicle_type", "truck"),
+            "unit_number":    f.get("unit_number", ""),
+            "driver":         f.get("driver", ""),
+            "issue":          f.get("issue", ""),
+            "load":           f.get("load", ""),
+            "pickup":         f.get("pickup") or "—",
+            "delivery":       f.get("delivery") or "—",
+            "location":       f.get("location") or "—",
+            "setpoint":       f.get("setpoint") or "—",
+            "current_temp":   f.get("current_temp") or "—",
+            "temp_recorder":  f.get("temp_recorder", "N"),
+            "comments":       f.get("comments", ""),
+            "priority":       f.get("priority", "low"),
+            "handler":        handler_name,
+        }
+        report_text = _build_report(data)
+
+        dest_id = config.REPORTS_GROUP_ID
+        if not dest_id:
+            return jsonify({"ok": False, "error": "No reports group configured."}), 500
+
+        import requests as _requests
+        api = f"https://api.telegram.org/bot{BOT_TOKEN}"
+        files = request.files.getlist("media")
+
+        def _kind_for(file_storage):
+            mt = (file_storage.mimetype or "").lower()
+            if mt.startswith("video"):
+                return "sendVideo", "video"
+            if mt.startswith("image"):
+                return "sendPhoto", "photo"
+            return "sendDocument", "document"
+
+        try:
+            if files:
+                first = files[0]
+                method, field = _kind_for(first)
+                resp = _requests.post(
+                    f"{api}/{method}",
+                    data={"chat_id": dest_id, "caption": report_text, "parse_mode": "Markdown"},
+                    files={field: (first.filename, first.stream, first.mimetype)},
+                    timeout=30,
+                )
+                if not resp.ok:
+                    # Markdown escaping issue or similar — fall back to plain caption
+                    first.stream.seek(0)
+                    resp = _requests.post(
+                        f"{api}/{method}",
+                        data={"chat_id": dest_id, "caption": report_text[:1024]},
+                        files={field: (first.filename, first.stream, first.mimetype)},
+                        timeout=30,
+                    )
+                    resp.raise_for_status()
+                for extra in files[1:]:
+                    method, field = _kind_for(extra)
+                    try:
+                        _requests.post(
+                            f"{api}/{method}",
+                            data={"chat_id": dest_id},
+                            files={field: (extra.filename, extra.stream, extra.mimetype)},
+                            timeout=30,
+                        )
+                    except Exception as e:
+                        logger.error(f"webapp extra media failed: {e}")
+            else:
+                resp = _requests.post(
+                    f"{api}/sendMessage",
+                    data={"chat_id": dest_id, "text": report_text, "parse_mode": "Markdown"},
+                    timeout=15,
+                )
+                resp.raise_for_status()
+        except Exception as e:
+            logger.error(f"webapp submit_report send failed: {e}")
+            return jsonify({"ok": False, "error": "Failed to deliver report to the reports group."}), 502
+
+        try:
+            report_case(case_id)
+            vtype       = data["vehicle_type"]
+            unit_number = data["unit_number"]
+            fleet_fk    = {"truck": "truck_id", "trailer": "trailer_id", "reefer": "reefer_id"}.get(vtype)
+            fleet_fields = {}
+            if fleet_fk and unit_number:
+                unit_id = get_or_create_unit(unit_number, vtype)
+                if unit_id:
+                    fleet_fields[fleet_fk] = unit_id
+            update_case_fields(
+                case_id,
+                vehicle_type=vtype, unit_number=unit_number,
+                report_driver=data["driver"], issue_text=data["issue"],
+                load_type=data["load"], location=data["location"],
+                priority=data["priority"], pickup=data["pickup"], delivery=data["delivery"],
+                comments=data["comments"], setpoint=data["setpoint"],
+                current_temp=data["current_temp"], temp_recorder=data["temp_recorder"],
+                **fleet_fields,
+            )
+        except Exception as e:
+            logger.error(f"webapp submit_report DB update failed: {e}")
+            # Report already reached the reports group — don't fail the request over
+            # analytics bookkeeping, just log it.
+
+        _clear_draft(case_id, user["id"])
+
+        try:
+            _requests.post(
+                f"{api}/sendMessage",
+                data={"chat_id": user["id"], "text": "✅ Report sent!", "disable_notification": True},
+                timeout=10,
+            )
+        except Exception:
+            pass
+
+        return jsonify({"ok": True})
+    except Exception as e:
+        logger.error(f"submit_report unhandled error: {e}", exc_info=True)
+        return jsonify({"ok": False, "error": "Unexpected server error. Please try again."}), 500
 
 
 @app.route("/login")
