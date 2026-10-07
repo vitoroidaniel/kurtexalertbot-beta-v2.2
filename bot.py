@@ -50,6 +50,10 @@ logging.basicConfig(
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
+# python-telegram-bot/httpx logs include the Bot API URL (and therefore token).
+# Keep transport logs out of production output.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 # ── Typing decorator ──────────────────────────────────────────────────────────
@@ -146,6 +150,7 @@ async def post_init(application: Application) -> None:
     # bot menu. Case-specific Report buttons still open the same Mini App
     # directly on the linked report form.
     if config.PUBLIC_URL:
+        logger.info("Report Mini App enabled at %s/report-app", config.PUBLIC_URL)
         try:
             await application.bot.set_chat_menu_button(
                 menu_button=MenuButtonWebApp(
@@ -431,8 +436,10 @@ def main():
     # ── Role selection callback (from forward flow) ──
     app.add_handler(CallbackQueryHandler(cb_addrole, pattern=r"^addrole\|"))
 
-    app.add_handler(get_solve_conversation())
-    app.add_handler(get_report_conversation())
+    # Report is the only action that needs a ConversationHandler. Close/Solve
+    # is stateless and is registered below as ordinary callbacks. Keeping an
+    # empty solve ConversationHandler here could intercept action callbacks.
+    app.add_handler(get_report_conversation(), group=0)
 
     import re as _re
     def _build_pattern(words):
@@ -453,15 +460,17 @@ def main():
         alert_h.handle_channel_post,
     ))
 
-    app.add_handler(CallbackQueryHandler(alert_h.handle_assignment,  pattern=r'^(assign|assignrpt|ignore)\|'))
-    app.add_handler(CallbackQueryHandler(alert_h.handle_reassign,    pattern=r'^reassign_'))
-    app.add_handler(CallbackQueryHandler(cb_done_pick,               pattern=r'^done_pick\|'))
-    app.add_handler(CallbackQueryHandler(cb_solve_start,             pattern=r'^solve\|'))
-    app.add_handler(CallbackQueryHandler(cb_close_ask,               pattern=r'^close_ask\|'))
-    app.add_handler(CallbackQueryHandler(cb_solve_confirm,           pattern=r'^solve_confirm\|'))
-    app.add_handler(CallbackQueryHandler(cb_solve_cancel,            pattern=r'^solve_cancel\|'))
-    app.add_handler(CallbackQueryHandler(cb_close_confirm,           pattern=r'^close_confirm\|'))
-    app.add_handler(CallbackQueryHandler(cb_close_cancel,            pattern=r'^close_cancel\|'))
+    # Core case actions live in their own handler group. PTB executes at most
+    # one matching handler per group, so this prevents ConversationHandlers
+    # from starving Ignore / Close / Reassign callbacks.
+    app.add_handler(CallbackQueryHandler(alert_h.handle_assignment,  pattern=r'^(assign|assignrpt|ignore)\|'), group=1)
+    app.add_handler(CallbackQueryHandler(alert_h.handle_reassign,    pattern=r'^reassign_'), group=1)
+    app.add_handler(CallbackQueryHandler(cb_done_pick,               pattern=r'^done_pick\|'), group=1)
+    app.add_handler(CallbackQueryHandler(cb_close_ask,               pattern=r'^close_ask\|'), group=1)
+    app.add_handler(CallbackQueryHandler(cb_solve_confirm,           pattern=r'^solve_confirm\|'), group=1)
+    app.add_handler(CallbackQueryHandler(cb_solve_cancel,            pattern=r'^solve_cancel\|'), group=1)
+    app.add_handler(CallbackQueryHandler(cb_close_confirm,           pattern=r'^close_confirm\|'), group=1)
+    app.add_handler(CallbackQueryHandler(cb_close_cancel,            pattern=r'^close_cancel\|'), group=1)
     app.add_handler(CallbackQueryHandler(cb_delete_confirm,          pattern=r'^delete_confirm\|'))
     app.add_handler(CallbackQueryHandler(cb_delete_do,               pattern=r'^delete_do\|'))
     app.add_handler(CallbackQueryHandler(cb_delete_keep,             pattern=r'^delete_keep\|'))

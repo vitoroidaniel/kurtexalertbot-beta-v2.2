@@ -76,7 +76,8 @@ class Config:
     # Public HTTPS base URL of this Railway service (Settings → Networking →
     # Generate Domain), used to build the Report Mini App link. Without it,
     # the Report button falls back to the old chat-based /report flow.
-    PUBLIC_URL           = os.getenv("PUBLIC_URL", "").strip().rstrip("/")
+    _public_url_raw      = (os.getenv("PUBLIC_URL") or os.getenv("RAILWAY_PUBLIC_DOMAIN") or "").strip().rstrip("/")
+    PUBLIC_URL           = ("https://" + _public_url_raw if _public_url_raw and not _public_url_raw.startswith(("http://", "https://")) else _public_url_raw)
 
 
 config = Config()

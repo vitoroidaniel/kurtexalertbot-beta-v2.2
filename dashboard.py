@@ -3137,7 +3137,11 @@ REPORT_APP_HTML = r"""<!DOCTYPE html>
 </div>
 
 <script>
-const tg = window.Telegram.WebApp;
+const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+if(!tg){
+  document.body.innerHTML = '<div style="font-family:Inter,system-ui;padding:28px"><h2>Open in Telegram</h2><p>This report workspace must be opened from the Kurtex bot.</p></div>';
+  throw new Error('Telegram WebApp bridge unavailable');
+}
 tg.ready();
 tg.expand();
 document.body.dataset.scheme = tg.colorScheme || 'dark';
@@ -3438,6 +3442,7 @@ async function submit(){
 @app.route("/report-app")
 def report_app():
     case_id = request.args.get("case_id", "").strip()
+    logger.info("Report Mini App opened case=%s source=%s", case_id[:12] if case_id else "home", request.args.get("source", "menu"))
     from storage.case_store import get_case
     case = get_case(case_id) if case_id else None
     if case_id and (not case or case.get("status") not in ("assigned",)):
