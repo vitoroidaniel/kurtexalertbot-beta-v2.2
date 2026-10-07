@@ -2964,151 +2964,35 @@ REPORT_APP_HTML = r"""<!DOCTYPE html>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --bg: #000000; --surface: #141414; --surface-2: #1E1E1E; --raised: #262626;
-    --ink: #FFFFFF; --muted: #A6A6A6; --line: #2C2C2C;
-    --accent: #FF8A1E; --accent-ink: #100A00;
-    --ok: #3FC97C; --warn: #FFC53D; --danger: #FF5A4E;
-    --stamp-low: #3FC97C; --stamp-med: #FFC53D; --stamp-high: #FF5A4E;
-  }
-  [data-scheme="light"]{
-    --bg: #FFFFFF; --surface: #F5F5F5; --surface-2: #ECECEC; --raised: #FFFFFF;
-    --ink: #0A0A0A; --muted: #66686B; --line: #DEDEDE;
-    --accent: #D9600A; --accent-ink: #FFFFFF;
-    --ok: #1E9A57; --warn: #B8790A; --danger: #C93A2E;
-    --stamp-low: #1E9A57; --stamp-med: #B8790A; --stamp-high: #C93A2E;
-  }
-  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-  html,body{background:var(--bg);}
-  body{
-    margin:0; font-family:'Inter',-apple-system,sans-serif;
-    background:var(--bg); color:var(--ink); padding:14px 14px 110px;
-    transition:background .2s;
-  }
-  .eyebrow{
-    font-family:'Oswald',sans-serif; font-size:11px; font-weight:600; letter-spacing:1.6px;
-    text-transform:uppercase; color:var(--muted);
-  }
-  .mono{font-family:'JetBrains Mono',ui-monospace,monospace;}
-
-  /* ---- Ticket header: torn work-order stub ---- */
-  .ticket{
-    position:relative; background:var(--surface); border-radius:16px 16px 4px 4px;
-    padding:16px 16px 18px; margin-bottom:16px; border:1px solid var(--line);
-  }
-  .ticket::after{
-    content:""; position:absolute; left:0; right:0; bottom:-9px; height:18px;
-    background:
-      radial-gradient(circle 5px at 14px 0, transparent 5px, var(--bg) 5.5px) top left/28px 18px repeat-x,
-      var(--surface);
-    -webkit-mask: linear-gradient(#000,#000) top/100% 9px no-repeat;
-            mask: linear-gradient(#000,#000) top/100% 9px no-repeat;
-    border-radius:0 0 4px 4px;
-  }
-  .ticket-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
-  .ticket-id{font-size:11px; color:var(--muted);}
-  .ticket-id b{color:var(--ink); font-weight:600;}
-  .ticket h1{
-    font-family:'Oswald',sans-serif; font-size:19px; font-weight:600; margin:8px 0 2px;
-    letter-spacing:.2px;
-  }
-  .ticket .meta{color:var(--muted); font-size:13px; line-height:1.5;}
-
-  /* ---- Priority stamp ---- */
-  .stamp{
-    font-family:'Oswald',sans-serif; font-size:11px; font-weight:700; letter-spacing:1.4px;
-    text-transform:uppercase; padding:6px 10px; border-radius:7px;
-    border:2px solid currentColor; transform:rotate(-6deg); white-space:nowrap;
-    flex-shrink:0;
-  }
-  .stamp.low{color:var(--stamp-low);}
-  .stamp.medium{color:var(--stamp-med);}
-  .stamp.high{color:var(--stamp-high);}
-
-  /* ---- Cards ---- */
-  .card{
-    background:var(--surface); border:1px solid var(--line); border-radius:14px;
-    padding:14px; margin-bottom:12px;
-  }
-  .card-head{display:flex; align-items:center; gap:8px; margin-bottom:12px;}
-  .card-head .ic{color:var(--accent); flex-shrink:0;}
-  .card-head .lbl{
-    font-family:'Oswald',sans-serif; font-size:12px; font-weight:600; letter-spacing:1.1px;
-    text-transform:uppercase; color:var(--muted);
-  }
-
-  .field{margin-bottom:11px;}
-  .field:last-child{margin-bottom:0;}
-  .field-label{font-size:12px; color:var(--muted); margin-bottom:5px; font-weight:500;}
-  input[type=text], textarea{
-    width:100%; padding:11px 12px; border-radius:9px; border:1px solid var(--line);
-    background:var(--surface-2); color:var(--ink); font-size:15px; font-family:inherit;
-  }
-  input[type=text]:focus, textarea:focus{outline:2px solid var(--accent); outline-offset:-1px; border-color:var(--accent);}
-  input.mono-field{font-family:'JetBrains Mono',ui-monospace,monospace; letter-spacing:.3px;}
-  textarea{resize:vertical; min-height:58px; font-family:inherit;}
-  input::placeholder, textarea::placeholder{color:var(--muted); opacity:.7;}
-  .hidden{display:none !important;}
-
-  /* ---- Segmented controls ---- */
-  .seg{display:flex; gap:6px;}
-  .seg button{
-    flex:1; display:flex; flex-direction:column; align-items:center; gap:5px;
-    padding:10px 4px; border-radius:10px; border:1px solid var(--line);
-    background:var(--surface-2); color:var(--muted); font-size:12.5px; font-weight:600;
-    cursor:pointer; font-family:'Inter',sans-serif; transition:.12s;
-  }
-  .seg button svg{width:18px; height:18px;}
-  .seg button.active{border-color:var(--accent); background:var(--accent); color:var(--accent-ink);}
-  .seg.wrap{flex-wrap:wrap;}
-  .seg.wrap button{flex:1 1 calc(50% - 3px); min-width:calc(50% - 3px); flex-direction:row; justify-content:center;}
-
-  .prio{display:flex; gap:6px;}
-  .prio button{
-    flex:1; padding:9px 4px; border-radius:9px; border:1.5px solid; font-size:12.5px;
-    font-weight:700; cursor:pointer; background:transparent; font-family:'Oswald',sans-serif;
-    letter-spacing:.4px; text-transform:uppercase;
-  }
-  .prio button[data-v=low]{color:var(--stamp-low); border-color:var(--stamp-low);}
-  .prio button[data-v=medium]{color:var(--stamp-med); border-color:var(--stamp-med);}
-  .prio button[data-v=high]{color:var(--stamp-high); border-color:var(--stamp-high);}
-  .prio button.active{color:var(--bg) !important;}
-  .prio button.active[data-v=low]{background:var(--stamp-low);}
-  .prio button.active[data-v=medium]{background:var(--stamp-med);}
-  .prio button.active[data-v=high]{background:var(--stamp-high);}
-
-  /* ---- Media strip ---- */
-  .media-strip{display:flex; gap:8px; flex-wrap:wrap;}
-  .thumb{position:relative; width:66px; height:66px; border-radius:10px; overflow:hidden; background:var(--surface-2); border:1px solid var(--line);}
-  .thumb img, .thumb video{width:100%; height:100%; object-fit:cover;}
-  .thumb .x{
-    position:absolute; top:3px; right:3px; width:18px; height:18px; border-radius:50%;
-    background:rgba(0,0,0,.65); color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer;
-  }
-  .thumb .x svg{width:10px; height:10px;}
-  .add-media{
-    width:66px; height:66px; border-radius:10px; border:1.5px dashed var(--line);
-    display:flex; align-items:center; justify-content:center; color:var(--muted); cursor:pointer; background:var(--surface-2);
-  }
-
-  .err{
-    color:var(--danger); font-size:13px; margin-top:6px; padding:10px 12px;
-    background:color-mix(in srgb, var(--danger) 12%, transparent); border-radius:9px; display:none;
-  }
-  .draft-note{
-    display:flex; align-items:center; gap:7px; font-size:12px; color:var(--muted);
-    background:var(--surface-2); border:1px solid var(--line); border-radius:10px;
-    padding:9px 11px; margin-bottom:14px;
-  }
-  .draft-note svg{width:14px; height:14px; color:var(--accent); flex-shrink:0;}
-
-  .done-screen{text-align:center; padding-top:110px;}
-  .done-screen .ic{color:var(--ok); margin-bottom:14px;}
-  .done-screen h2{font-family:'Oswald',sans-serif; font-size:18px; margin:0 0 4px;}
-  .done-screen p{color:var(--muted); font-size:13px;}
+:root{--bg:#f3f5fa;--surface:#fff;--surface2:#f5f7fc;--surface3:#e7ecf5;--border:#dfe5ef;--text:#202c43;--muted:#63718a;--muted2:#78869e;--accent:#405bd8;--accent-bg:#edf0ff;--green:#4764b8;--green-bg:#edf1fc;--red:#bf5050;--red-bg:#fceeee;--yellow:#a36e21;--yellow-bg:#fff4df;--blue:#437ba0;--blue-bg:#edf4f9;--purple:#8270ac;--purple-bg:#f1eef8;--shadow:0 2px 5px #17392c04;--radius:12px}
+[data-scheme="dark"]{color-scheme:dark;--bg:#101726;--surface:#192235;--surface2:#202d43;--surface3:#2b3950;--border:#34435c;--text:#edf2fc;--muted:#b3bfd5;--muted2:#91a2c0;--accent:#97acff;--accent-bg:#2a3659;--green:#a7baff;--green-bg:#293957;--red:#ef9b98;--red-bg:#4b302f;--yellow:#e8bd6d;--yellow-bg:#463e29;--blue:#90bfe0;--blue-bg:#253c49;--purple:#bdabe1;--purple-bg:#3b334c;--shadow:none}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{background:var(--bg)}body{margin:0;font-family:'Inter',Arial,sans-serif;background:var(--bg);color:var(--text);padding:14px 14px 112px;font-size:14px}.hidden{display:none!important}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.eyebrow{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.ticket{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;margin-bottom:12px;box-shadow:var(--shadow)}.ticket-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.ticket-id{font-size:11px;color:var(--muted);font-weight:600}.ticket-id b{color:var(--text)}.ticket h1{font-size:18px;font-weight:700;margin:7px 0 4px;letter-spacing:-.02em}.ticket .meta{color:var(--muted);font-size:12px;line-height:1.5}.stamp{font-size:11px;font-weight:700;padding:5px 9px;border-radius:999px;white-space:nowrap;border:1px solid var(--border);background:var(--surface2);transform:none}.stamp.low{color:var(--green);background:var(--green-bg);border-color:color-mix(in srgb,var(--green) 24%,var(--border))}.stamp.medium{color:var(--yellow);background:var(--yellow-bg);border-color:color-mix(in srgb,var(--yellow) 24%,var(--border))}.stamp.high{color:var(--red);background:var(--red-bg);border-color:color-mix(in srgb,var(--red) 24%,var(--border))}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:10px;box-shadow:var(--shadow)}.card-head{display:flex;align-items:center;gap:9px;margin-bottom:13px}.card-head .ic{color:var(--accent);flex-shrink:0;width:17px;height:17px}.card-head .lbl{font-size:12px;font-weight:700;color:var(--text)}.field{margin-bottom:12px}.field:last-child{margin-bottom:0}.field-label{font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600}input[type=text],textarea{width:100%;padding:10px 11px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px;font-family:inherit;transition:border-color .15s,box-shadow .15s,background .15s}input[type=text]:focus,textarea:focus{outline:none;border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 13%,transparent)}input.mono-field{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}textarea{resize:vertical;min-height:76px}input::placeholder,textarea::placeholder{color:var(--muted2)}
+.seg{display:flex;gap:7px}.seg button{flex:1;min-height:38px;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 7px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s}.seg button svg{width:16px;height:16px}.seg button:hover{border-color:color-mix(in srgb,var(--accent) 35%,var(--border));background:var(--surface2)}.seg button.active{border-color:var(--accent);background:var(--accent-bg);color:var(--accent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 18%,transparent)}.seg.wrap{flex-wrap:wrap}.seg.wrap button{flex:1 1 calc(50% - 4px);min-width:calc(50% - 4px)}
+.prio{display:flex;gap:7px}.prio button{flex:1;min-height:38px;padding:8px 5px;border-radius:9px;border:1px solid var(--border);font-size:12px;font-weight:700;cursor:pointer;background:var(--surface);font-family:inherit}.prio button[data-v=low]{color:var(--green)}.prio button[data-v=medium]{color:var(--yellow)}.prio button[data-v=high]{color:var(--red)}.prio button.active[data-v=low]{background:var(--green-bg);border-color:var(--green)}.prio button.active[data-v=medium]{background:var(--yellow-bg);border-color:var(--yellow)}.prio button.active[data-v=high]{background:var(--red-bg);border-color:var(--red)}
+.media-strip{display:flex;gap:8px;flex-wrap:wrap}.thumb,.add-media{width:72px;height:72px;border-radius:10px}.thumb{position:relative;overflow:hidden;background:var(--surface2);border:1px solid var(--border)}.thumb img,.thumb video{width:100%;height:100%;object-fit:cover}.thumb .x{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:7px;background:rgba(15,23,42,.78);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}.thumb .x svg{width:10px;height:10px}.add-media{border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--accent);cursor:pointer;background:var(--surface2);transition:.15s}.add-media:hover{border-color:var(--accent);background:var(--accent-bg)}
+.err{color:var(--red);font-size:12px;margin-top:8px;padding:10px 12px;background:var(--red-bg);border:1px solid color-mix(in srgb,var(--red) 25%,var(--border));border-radius:9px;display:none}.draft-note{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);background:var(--accent-bg);border:1px solid color-mix(in srgb,var(--accent) 20%,var(--border));border-radius:10px;padding:10px 12px;margin-bottom:10px}.draft-note svg{width:14px;height:14px;color:var(--accent);flex-shrink:0}
+.home-screen{min-height:78vh;display:flex;align-items:center;justify-content:center;padding:22px 4px 80px}.home-card{width:100%;max-width:520px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,.08)}.home-mark{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--accent-bg);color:var(--accent);margin-bottom:18px}.home-mark svg{width:21px;height:21px}.home-card h1{font-size:20px;line-height:1.15;margin:6px 0 8px;font-weight:700;letter-spacing:-.02em}.home-card p{font-size:13px;line-height:1.6;color:var(--muted);margin:0}.home-rule{height:1px;background:var(--border);margin:20px 0}.home-status{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:600}.home-status-dot{width:8px;height:8px;border-radius:50%;background:var(--green)}.home-tip{margin-top:15px;padding:11px 12px;border-radius:10px;background:var(--surface2);color:var(--muted);font-size:12px;line-height:1.5}
+.submit-status{position:fixed;left:14px;right:14px;bottom:18px;z-index:20;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:11px 12px;box-shadow:0 8px 30px rgba(0,0,0,.15);display:none}.submit-status.show{display:block}.submit-row{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;font-weight:700}.submit-row span:last-child{color:var(--muted);font-weight:600}.submit-track{height:4px;border-radius:99px;background:var(--surface3);overflow:hidden;margin-top:8px}.submit-bar{height:100%;width:0;background:var(--accent);transition:width .18s ease}.done-screen{text-align:center;padding-top:110px}.done-screen .ic{color:var(--green);margin-bottom:14px}.done-screen h2{font-size:17px;margin:0 0 5px}.done-screen p{color:var(--muted);font-size:12px}
+@media(max-width:420px){body{padding:10px 10px 105px}.ticket,.card{border-radius:12px}.ticket{padding:15px}.card{padding:14px}.ticket h1{font-size:17px}.seg{gap:5px}.seg button{font-size:11.5px;padding:8px 4px}.prio{gap:5px}.home-card{padding:20px}}
 </style>
 </head>
 <body>
+
+<div id="home-view" class="home-screen hidden">
+  <div class="home-card">
+    <div class="home-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+    <div class="eyebrow">Kurtex reports</div>
+    <h1>Ready for the next case.</h1>
+    <p>Keep this Mini App available in Telegram. When you tap <b>Report</b> on an active case, Kurtex opens that report directly with the case already linked.</p>
+    <div class="home-rule"></div>
+    <div class="home-status"><span class="home-status-dot"></span><span>Report workspace ready</span></div>
+    <div class="home-tip">No extra “Create report” step. Open the case in the bot, tap <b>Report</b>, fill the sheet and send it. After submission this screen is cleared and ready again.</div>
+  </div>
+</div>
+
+<div class="submit-status" id="submit-status"><div class="submit-row"><span id="submit-label">Sending report…</span><span id="submit-pct"></span></div><div class="submit-track"><div class="submit-bar" id="submit-bar"></div></div></div>
 
 <div id="form-view">
   <div class="ticket">
@@ -3260,7 +3144,12 @@ document.body.dataset.scheme = tg.colorScheme || 'dark';
 tg.onEvent('themeChanged', () => document.body.dataset.scheme = tg.colorScheme || 'dark');
 
 const CASE_ID = {{ case_id|tojson }};
+const HAS_CASE = Boolean(CASE_ID);
 const DRAFT_KEY = 'kurtex_draft_' + CASE_ID;
+if(!HAS_CASE){
+  document.getElementById('form-view').classList.add('hidden');
+  document.getElementById('home-view').classList.remove('hidden');
+}
 const state = {
   vehicle_type: "truck", load: "JBS Load", temp_recorder: "N", priority: "low",
   media: []  // {file, kind} — not persisted across reloads, only text fields are
@@ -3268,7 +3157,7 @@ const state = {
 
 // Try to hand the native bottom button our accent color so it feels part of the same system.
 try{
-  tg.MainButton.setParams({ color: '#FF8A1E', text_color: '#1A1100' });
+  tg.MainButton.setParams({ color: '#405BD8', text_color: '#FFFFFF' });
 }catch(e){}
 
 function seg(id, key, onchange){
@@ -3424,13 +3313,45 @@ async function loadDraft(){
     document.getElementById('draft-note').classList.remove('hidden');
   }
 }
-loadDraft();
+if(HAS_CASE) loadDraft();
 
 document.querySelectorAll('input[type=text], textarea').forEach(el => el.addEventListener('input', scheduleSave));
 
 tg.MainButton.setText('Send Report');
-tg.MainButton.show();
+if(HAS_CASE){
+  tg.MainButton.show();
+  try{ tg.BackButton.show(); }catch(e){}
+}else{
+  tg.MainButton.hide();
+  try{ tg.BackButton.hide(); }catch(e){}
+}
 tg.MainButton.onClick(submit);
+try{ tg.BackButton.onClick(showHome); }catch(e){}
+
+function resetReportForm(){
+  TEXT_FIELDS.forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  state.vehicle_type='truck'; state.load='JBS Load'; state.temp_recorder='N'; state.priority='low';
+  state.media.forEach(m=>{ try{ URL.revokeObjectURL(m.url); }catch(e){} });
+  state.media=[];
+  document.querySelectorAll('.thumb').forEach(el=>el.remove());
+  document.querySelector('#seg-type button[data-v="truck"]')?.click();
+  document.querySelector('#seg-load button[data-v="JBS Load"]')?.click();
+  document.querySelector('#seg-temprec button[data-v="N"]')?.click();
+  document.querySelector('#seg-priority button[data-v="low"]')?.click();
+  document.getElementById('draft-note').classList.add('hidden');
+  document.getElementById('err-box').style.display='none';
+}
+function showHome(){
+  resetReportForm();
+  try{ localStorage.removeItem(DRAFT_KEY); }catch(e){}
+  document.getElementById('done-view').classList.add('hidden');
+  document.getElementById('form-view').classList.add('hidden');
+  document.getElementById('home-view').classList.remove('hidden');
+  document.getElementById('submit-status').classList.remove('show');
+  tg.MainButton.hide();
+  try{ tg.BackButton.hide(); }catch(e){}
+  window.scrollTo({top:0,behavior:'smooth'});
+}
 
 async function submit(){
   if(state.submitting) return;  // belt-and-suspenders: ignore re-entrant taps
@@ -3466,22 +3387,42 @@ async function submit(){
   fd.append('priority', state.priority);
   state.media.forEach(m => fd.append('media', m.file, m.file.name || (m.kind + '.jpg')));
 
+  const statusBox=document.getElementById('submit-status');
+  const statusLabel=document.getElementById('submit-label');
+  const statusPct=document.getElementById('submit-pct');
+  const statusBar=document.getElementById('submit-bar');
+  statusBox.classList.add('show'); statusLabel.textContent='Uploading report…'; statusPct.textContent=''; statusBar.style.width='8%';
   try{
-    const res = await fetch('/api/webapp/submit_report', { method: 'POST', body: fd });
-    let data;
-    try{ data = await res.json(); }
-    catch(parseErr){ throw new Error('Server error (HTTP ' + res.status + '). Please try again.'); }
-    if(!res.ok || !data.ok){
-      throw new Error(data.error || 'Failed to send report.');
-    }
+    const data = await new Promise((resolve,reject)=>{
+      const xhr=new XMLHttpRequest();
+      xhr.open('POST','/api/webapp/submit_report');
+      xhr.upload.onprogress=(e)=>{
+        if(!e.lengthComputable) return;
+        const pct=Math.max(8,Math.min(92,Math.round((e.loaded/e.total)*92)));
+        statusBar.style.width=pct+'%'; statusPct.textContent=pct+'%';
+        if(pct>=90) statusLabel.textContent='Sending to Kurtex…';
+      };
+      xhr.onload=()=>{
+        let parsed={};
+        try{ parsed=JSON.parse(xhr.responseText||'{}'); }catch(e){ reject(new Error('Server error (HTTP '+xhr.status+'). Please try again.')); return; }
+        if(xhr.status<200 || xhr.status>=300 || !parsed.ok){ reject(new Error(parsed.error||'Failed to send report.')); return; }
+        resolve(parsed);
+      };
+      xhr.onerror=()=>reject(new Error('Connection interrupted. Your report was not cleared — try again.'));
+      xhr.send(fd);
+    });
+    statusBar.style.width='100%'; statusPct.textContent='100%'; statusLabel.textContent='Report sent';
     try{ localStorage.removeItem(DRAFT_KEY); }catch(e){}
     tg.HapticFeedback.notificationOccurred('success');
     document.getElementById('form-view').classList.add('hidden');
     document.getElementById('done-view').classList.remove('hidden');
     tg.MainButton.hide();
-    setTimeout(() => tg.close(), 1400);
+    try{ tg.BackButton.hide(); }catch(e){}
+    resetReportForm();
+    setTimeout(showHome, 900);
   }catch(err){
     state.submitting = false;
+    statusBox.classList.remove('show');
     tg.MainButton.hideProgress();
     tg.MainButton.enable();
     showError(err.message || 'Something went wrong. Please try again.');
@@ -3496,21 +3437,21 @@ async function submit(){
 
 @app.route("/report-app")
 def report_app():
-    case_id = request.args.get("case_id", "")
+    case_id = request.args.get("case_id", "").strip()
     from storage.case_store import get_case
     case = get_case(case_id) if case_id else None
-    if not case or case.get("status") not in ("assigned",):
+    if case_id and (not case or case.get("status") not in ("assigned",)):
         msg = "This case was already reported." if case and case.get("status") == "reported" else "This case is no longer active."
         return render_template_string(
-            "<body style='font-family:sans-serif;padding:40px;text-align:center;color:#888'>"
-            + msg + " You can close this window.</body>"
+            "<body style='font-family:Inter,sans-serif;padding:40px;text-align:center;color:#888'>"
+            + msg + " You can return to the report workspace.</body>"
         )
     return render_template_string(
         REPORT_APP_HTML,
         case_id=case_id,
-        driver_name=case.get("driver_name", "—"),
-        group_name=case.get("group_name", "—"),
-        issue_preview=(case.get("description") or "")[:100],
+        driver_name=(case or {}).get("driver_name", "—"),
+        group_name=(case or {}).get("group_name", "—"),
+        issue_preview=((case or {}).get("description") or "")[:100],
     )
 
 

@@ -366,3 +366,10 @@ explicitly not meant for production and doesn't have the same crash
 isolation as the bot's own error handling. Splitting it into its own
 service behind a real WSGI server (gunicorn/waitress) is still the
 recommended next step, deferred per earlier discussion.
+
+## v2.3 Mini Report workspace
+- Persistent Telegram menu button opens the Kurtex Reports home screen when PUBLIC_URL is configured.
+- Case Report buttons open the linked report form directly with no extra Create Report step.
+- After successful submission, the form and attachments are cleared and the Mini App returns to its home screen instead of closing.
+- Added visible upload/send progress to avoid the previous frozen-looking submission state.
+- Existing case/report backend and fallback chat flow are preserved.

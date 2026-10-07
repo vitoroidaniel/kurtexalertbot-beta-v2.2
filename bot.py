@@ -11,7 +11,7 @@ import os
 import signal
 import time as _time
 
-from telegram import Update
+from telegram import Update, MenuButtonWebApp, WebAppInfo
 from telegram.constants import ChatAction
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
@@ -141,6 +141,20 @@ async def post_init(application: Application) -> None:
     ]
 
     await application.bot.set_my_commands(base_commands)
+
+    # Keep the Kurtex report workspace available from Telegram's persistent
+    # bot menu. Case-specific Report buttons still open the same Mini App
+    # directly on the linked report form.
+    if config.PUBLIC_URL:
+        try:
+            await application.bot.set_chat_menu_button(
+                menu_button=MenuButtonWebApp(
+                    text="Kurtex Reports",
+                    web_app=WebAppInfo(url=f"{config.PUBLIC_URL}/report-app"),
+                )
+            )
+        except Exception as e:
+            logger.warning(f"Could not configure report Mini App menu button: {e}")
 
     # Set extended command list for developer + super_admin
     for uid_str, u in get_all_users().items():
